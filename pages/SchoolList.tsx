@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useData } from '../contexts/DataContext';
-import { MapPin, Star, Users, Search, Map as MapIcon, List, X, GraduationCap, Calendar, Hash, School as SchoolIcon, Layout, Filter } from 'lucide-react';
+import { MapPin, Star, Users, Search, Map as MapIcon, List, X, GraduationCap, Calendar, Hash, School as SchoolIcon, Layout, Filter, ArrowUpDown } from 'lucide-react';
 import { SchoolType, School, RegistryStudent } from '../types';
 
 export const SchoolList: React.FC = () => {
@@ -9,6 +9,7 @@ export const SchoolList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('Todos');
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [sortOption, setSortOption] = useState<string>('name');
   
   // States for the selected school modal
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
@@ -19,13 +20,52 @@ export const SchoolList: React.FC = () => {
   const [modalStatusFilter, setModalStatusFilter] = useState<string>('Todos');
   const [modalClassFilter, setModalClassFilter] = useState<string>('Todas');
 
-  // Filter main list of schools
-  const filteredSchools = schools.filter(school => {
-    const matchesSearch = school.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          school.address.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'Todos' || school.types.includes(filterType as SchoolType);
-    return matchesSearch && matchesType;
-  });
+  // Mock "User Location" (City Center) for distance calculation
+  // In a real app, this would come from navigator.geolocation
+  const userLocation = { lat: -12.5253, lng: -40.2917 };
+
+  // Haversine formula to calculate distance in km
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; 
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+    const d = R * c; 
+    return d;
+  };
+
+  // Process schools: Filter -> Calculate Distance -> Sort
+  const processedSchools = useMemo(() => {
+    // 1. Filter
+    let result = schools.filter(school => {
+      const matchesSearch = school.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            school.address.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesType = filterType === 'Todos' || school.types.includes(filterType as SchoolType);
+      return matchesSearch && matchesType;
+    });
+
+    // 2. Add Distance
+    result = result.map(school => ({
+      ...school,
+      distance: calculateDistance(userLocation.lat, userLocation.lng, school.lat, school.lng)
+    }));
+
+    // 3. Sort
+    return result.sort((a, b) => {
+      if (sortOption === 'name') {
+        return a.name.localeCompare(b.name);
+      } else if (sortOption === 'rating') {
+        return b.rating - a.rating;
+      } else if (sortOption === 'distance') {
+        return (a.distance || 0) - (b.distance || 0);
+      }
+      return 0;
+    });
+  }, [schools, searchTerm, filterType, sortOption]);
 
   // Logic for the Modal Data
   const schoolStudents = useMemo(() => {
@@ -80,7 +120,7 @@ export const SchoolList: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Escolas da Rede Municipal</h1>
-            <p className="text-slate-600">Gerencie e visualize as {filteredSchools.length} unidades de ensino.</p>
+            <p className="text-slate-600">Gerencie e visualize as {processedSchools.length} unidades de ensino.</p>
           </div>
           <div className="bg-white border border-slate-200 p-1 rounded-lg flex shadow-sm self-start md:self-auto">
             <button 
@@ -100,17 +140,34 @@ export const SchoolList: React.FC = () => {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Filters & Sorting */}
         <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 mb-8 flex flex-col lg:flex-row gap-4 items-center justify-between sticky top-20 z-30">
-          <div className="relative w-full lg:w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar escola..."
-              className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto items-center">
+            <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                <input
+                type="text"
+                placeholder="Buscar escola..."
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
+            
+            <div className="relative w-full sm:w-auto">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <ArrowUpDown className="h-4 w-4 text-slate-400" />
+                </div>
+                <select
+                    value={sortOption}
+                    onChange={(e) => setSortOption(e.target.value)}
+                    className="w-full sm:w-48 pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm text-slate-700 cursor-pointer appearance-none"
+                >
+                    <option value="name">Ordem Alfabética</option>
+                    <option value="rating">Melhor Avaliação</option>
+                    <option value="distance">Menor Distância</option>
+                </select>
+            </div>
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-2 lg:pb-0 w-full lg:w-auto scrollbar-hide">
@@ -140,7 +197,7 @@ export const SchoolList: React.FC = () => {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredSchools.map((school) => (
+            {processedSchools.map((school) => (
               <div key={school.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition duration-300 group flex flex-col h-full">
                 <div className="relative h-40 overflow-hidden">
                   <img 
@@ -170,7 +227,14 @@ export const SchoolList: React.FC = () => {
                   
                   <div className="flex items-start gap-2.5 text-slate-600 mb-6 flex-1">
                     <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0 text-slate-400" />
-                    <span className="text-sm leading-snug">{school.address}</span>
+                    <div className="flex flex-col">
+                        <span className="text-sm leading-snug">{school.address}</span>
+                        {school.distance !== undefined && (
+                            <span className="text-xs text-blue-600 font-medium mt-1">
+                                Aprox. {school.distance.toFixed(2)} km do Centro
+                            </span>
+                        )}
+                    </div>
                   </div>
 
                   <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto">
@@ -198,7 +262,7 @@ export const SchoolList: React.FC = () => {
           </div>
         )}
 
-        {filteredSchools.length === 0 && viewMode === 'list' && (
+        {processedSchools.length === 0 && viewMode === 'list' && (
           <div className="col-span-full text-center py-16">
             <div className="inline-flex bg-slate-100 p-4 rounded-full mb-4">
               <Search className="h-8 w-8 text-slate-400" />

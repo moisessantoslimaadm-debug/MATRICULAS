@@ -1,23 +1,37 @@
 
 import React, { useState, useMemo } from 'react';
-import { Upload, Download, FileSpreadsheet, Database, RefreshCw, Check, AlertTriangle, FileText, X, Users, Search, ChevronLeft, ChevronRight, School as SchoolIcon, Filter } from 'lucide-react';
+import { Upload, Download, FileSpreadsheet, Database, RefreshCw, Check, AlertTriangle, FileText, X, Users, Search, ChevronLeft, ChevronRight, School as SchoolIcon, Filter, Eye, Save, ListFilter, UserPlus } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import { School, SchoolType, RegistryStudent } from '../types';
 
 export const AdminData: React.FC = () => {
   const { schools, students, updateSchools, updateStudents, resetData } = useData();
-  const [isUploading, setIsUploading] = React.useState(false);
-  const [uploadStatus, setUploadStatus] = React.useState<'idle' | 'success' | 'error'>('idle');
-  const [errorMessage, setErrorMessage] = React.useState('');
-  const [successMessage, setSuccessMessage] = React.useState('');
-  const [uploadProgress, setUploadProgress] = React.useState(0);
-  const [isDragging, setIsDragging] = React.useState(false);
+  
+  // Upload States
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  // Feedback States
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
 
-  // State for Data Inspection Table
+  // Preview/Confirmation States
+  const [previewData, setPreviewData] = useState<any[] | null>(null);
+  const [importType, setImportType] = useState<'schools' | 'students' | 'educacenso' | null>(null);
+  const [educacensoSchool, setEducacensoSchool] = useState<School | null>(null); 
+
+  // Student List Inspection States
   const [searchTerm, setSearchTerm] = useState('');
   const [schoolFilter, setSchoolFilter] = useState('Todas');
+  const [statusFilter, setStatusFilter] = useState('Todos'); 
+  const [classFilter, setClassFilter] = useState('Todas');   
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Mass Allocation State
+  const [targetSchoolId, setTargetSchoolId] = useState('');
+  const [allocationMessage, setAllocationMessage] = useState('');
 
   // Extract unique school names from students for filter
   const schoolNames = useMemo(() => {
@@ -25,47 +39,26 @@ export const AdminData: React.FC = () => {
       return Array.from(names).sort();
   }, [students]);
 
-  // Normaliza strings para chaves de objeto (remove acentos, espaços, lowercase)
+  // Extract unique class names from students for filter
+  const classNames = useMemo(() => {
+      const classes = new Set(students.map(s => s.className).filter(Boolean));
+      return Array.from(classes).sort();
+  }, [students]);
+
+  // Count unallocated students
+  const unallocatedCount = useMemo(() => {
+    return students.filter(s => !s.school || s.school === 'Não alocada').length;
+  }, [students]);
+
+  // Normaliza strings para chaves de objeto
   const normalizeKey = (key: string) => {
     return key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
   };
 
-  // Função aprimorada para converter CSV em Objeto
-  const parseCSV = (text: string): any[] => {
-    const lines = text.split(/\r\n|\n/);
-    if (lines.length === 0) return [];
-
-    // Detectar separador (vírgula ou ponto e vírgula)
-    const firstLine = lines[0];
-    const separator = firstLine.includes(';') ? ';' : ',';
-
-    // Cabeçalhos originais para referência, normalizados para mapeamento
-    const headers = firstLine.split(separator).map(h => normalizeKey(h.trim()));
-    const result = [];
-
-    for (let i = 1; i < lines.length; i++) {
-      if (!lines[i].trim()) continue;
-      const obj: any = {};
-      const currentline = lines[i].split(separator);
-
-      for (let j = 0; j < headers.length; j++) {
-        const val = currentline[j] ? currentline[j].trim().replace(/^"|"$/g, '') : '';
-        obj[headers[j]] = val;
-      }
-      // Apenas adiciona se tiver pelo menos um campo preenchido
-      if (Object.keys(obj).some(k => obj[k])) {
-        result.push(obj);
-      }
-    }
-    return result;
-  };
-
-  // Helper para formatar data para DD/MM/AAAA
+  // Helper para formatar data
   const formatDate = (dateStr: string): string => {
     if (!dateStr) return '';
-    // Se já for DD/MM/AAAA
     if (dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) return dateStr;
-    // Se for YYYY-MM-DD
     if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
       const [y, m, d] = dateStr.split('-');
       return `${d}/${m}/${y}`;
@@ -73,27 +66,44 @@ export const AdminData: React.FC = () => {
     return dateStr;
   };
 
-  const processSchoolImport = (data: any[]) => {
-    const newSchools: School[] = data.map((item: any, index: number) => {
-      // Mapeamento flexível baseado nas chaves normalizadas
-      
-      // Processar Tipos de Escola
+  // --- CSV Parsers ---
+
+  const parseCSV = (text: string): any[] => {
+    const lines = text.split(/\r\n|\n/);
+    if (lines.length === 0) return [];
+    const firstLine = lines[0];
+    const separator = firstLine.includes(';') ? ';' : ',';
+    const headers = firstLine.split(separator).map(h => normalizeKey(h.trim()));
+    const result = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue;
+      const obj: any = {};
+      const currentline = lines[i].split(separator);
+      for (let j = 0; j < headers.length; j++) {
+        const val = currentline[j] ? currentline[j].trim().replace(/^"|"$/g, '') : '';
+        obj[headers[j]] = val;
+      }
+      if (Object.keys(obj).some(k => obj[k])) {
+        result.push(obj);
+      }
+    }
+    return result;
+  };
+
+  const mapSchoolsFromData = (data: any[]): School[] => {
+    return data.map((item: any, index: number) => {
       let types: SchoolType[] = [];
       const rawType = (item.tipo || item.types || item.modalidade || '').toLowerCase();
       
-      if (rawType.includes('infantil') || rawType.includes('creche') || rawType.includes('pre')) {
-        types.push(SchoolType.INFANTIL);
-      }
+      if (rawType.includes('infantil') || rawType.includes('creche') || rawType.includes('pre')) types.push(SchoolType.INFANTIL);
       if (rawType.includes('fundamental')) {
          if (rawType.includes('1') || rawType.includes('i') || rawType.includes('inicial')) types.push(SchoolType.FUNDAMENTAL_1);
          if (rawType.includes('2') || rawType.includes('ii') || rawType.includes('final')) types.push(SchoolType.FUNDAMENTAL_2);
-         // Se genérico, adiciona o 1 por padrão
          if (!types.includes(SchoolType.FUNDAMENTAL_1) && !types.includes(SchoolType.FUNDAMENTAL_2)) types.push(SchoolType.FUNDAMENTAL_1);
       }
       if (rawType.includes('medio')) types.push(SchoolType.MEDIO);
       if (rawType.includes('eja')) types.push(SchoolType.EJA);
-      
-      // Default se não encontrar
       if (types.length === 0) types.push(SchoolType.INFANTIL);
 
       return {
@@ -109,24 +119,15 @@ export const AdminData: React.FC = () => {
         lng: parseFloat(item.lng || item.longitude) || -46.633308
       };
     });
-    
-    if (newSchools.length > 0) {
-      updateSchools(newSchools);
-      return newSchools.length;
-    }
-    return 0;
   };
 
-  const processStudentImport = (data: any[]) => {
-    const newStudents: RegistryStudent[] = data.map((item: any, index: number) => {
-      // Mapeamento robusto de colunas
+  const mapStudentsFromData = (data: any[]): RegistryStudent[] => {
+    return data.map((item: any, index: number) => {
       const name = (item.name || item.nome || item.nomedoaluno || item.aluno || 'Aluno Sem Nome').toUpperCase();
       const cpfRaw = item.cpf || item.doc || item.documento || '';
-      const cpf = cpfRaw.replace(/\D/g, ''); // Remove tudo que não é dígito
-      
+      const cpf = cpfRaw.replace(/\D/g, '');
       const birthDateRaw = item.birthdate || item.nascimento || item.datadenascimento || item.dtnasc || '';
       
-      // Tenta inferir status
       const statusRaw = item.status || item.situacao || 'Matriculado';
       let status: RegistryStudent['status'] = 'Matriculado';
       if (statusRaw.toLowerCase().includes('pendente')) status = 'Pendente';
@@ -149,48 +150,24 @@ export const AdminData: React.FC = () => {
         specialNeeds: (item.specialneeds || item.deficiencia || item.nee || item.aee || '').toString().toLowerCase().includes('sim')
       };
     });
-
-    if (newStudents.length > 0) {
-      updateStudents(newStudents);
-      return newStudents.length;
-    }
-    return 0;
   };
 
-  // Processador específico para o layout do Educacenso (Arquivo enviado pelo usuário)
-  const processEducacenso = (text: string) => {
+  const processEducacensoRaw = (text: string) => {
     const lines = text.split(/\r\n|\n/);
     let schoolName = "Escola Municipal";
     let schoolCode = "";
     let city = "Município";
-    let schoolCreated = false;
     
     const newStudents: RegistryStudent[] = [];
     let isTableBody = false;
 
-    // 1. Extrair Metadados da Escola (Cabeçalho do arquivo)
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      
-      if (line.includes('Nome da escola:')) {
-        const parts = line.split(';');
-        const namePart = parts.find(p => p && p.trim() !== '' && !p.includes('Nome da escola'));
-        if (namePart) schoolName = namePart.trim();
-      }
-      
-      if (line.includes('Código da escola:')) {
-         const parts = line.split(';');
-         const codePart = parts.find(p => p && p.trim() !== '' && !p.includes('Código da escola'));
-         if (codePart) schoolCode = codePart.trim();
-      }
+      if (line.includes('Nome da escola:')) schoolName = line.split(';').find(p => p && p.trim() !== '' && !p.includes('Nome da escola'))?.trim() || schoolName;
+      if (line.includes('Código da escola:')) schoolCode = line.split(';').find(p => p && p.trim() !== '' && !p.includes('Código da escola'))?.trim() || schoolCode;
+      if (line.includes('Município:')) city = line.split(';').find(p => p && p.trim() !== '' && !p.includes('Município'))?.trim() || city;
 
-      if (line.includes('Município:')) {
-         const parts = line.split(';');
-         const cityPart = parts.find(p => p && p.trim() !== '' && !p.includes('Município'));
-         if (cityPart) city = cityPart.trim();
-      }
-
-      if (line.includes('Identificação única') && line.includes('Nome') && line.includes('Data de nascimento')) {
+      if (line.includes('Identificação única') && line.includes('Nome')) {
         isTableBody = true;
         continue; 
       }
@@ -208,12 +185,10 @@ export const AdminData: React.FC = () => {
             const classId = cols[27]?.trim();
             const className = cols[28]?.trim();
             const grade = cols[31]?.trim() || cols[30]?.trim(); 
-            
             let shift = 'Integral';
             const schedule = cols[34] || '';
             if (schedule.toLowerCase().includes('13:00') || className?.includes('VESPERTINO')) shift = 'Vespertino';
             else if (schedule.toLowerCase().includes('08:00') && !schedule.toLowerCase().includes('17:00') || className?.includes('MATUTINO')) shift = 'Matutino';
-
             const specialNeedsRaw = cols[15]?.trim();
             const specialNeeds = specialNeedsRaw && specialNeedsRaw !== '--' && specialNeedsRaw !== '';
 
@@ -237,50 +212,46 @@ export const AdminData: React.FC = () => {
       }
     }
 
-    if (newStudents.length > 0 || schoolName) {
-       const schoolExists = schools.some(s => s.name === schoolName || s.inep === schoolCode);
-       
-       if (!schoolExists) {
-         const newSchool: School = {
-            id: schoolCode || Date.now().toString(),
-            inep: schoolCode,
-            name: schoolName,
-            address: `${city} - BA`,
-            types: [SchoolType.INFANTIL, SchoolType.FUNDAMENTAL_1],
-            image: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&q=80',
-            rating: 5.0,
-            availableSlots: 0,
-            lat: -12.5253,
-            lng: -40.2917
-         };
-         updateSchools([newSchool]);
-         schoolCreated = true;
-       }
-       
-       updateStudents(newStudents);
-       
-       return {
-         count: newStudents.length,
-         school: schoolName,
-         created: schoolCreated
-       };
+    if (newStudents.length > 0) {
+        // Check if school exists, if not return it to be created
+        const schoolExists = schools.some(s => s.name === schoolName || s.inep === schoolCode);
+        let newSchool: School | null = null;
+        
+        if (!schoolExists) {
+             newSchool = {
+                id: schoolCode || Date.now().toString(),
+                inep: schoolCode,
+                name: schoolName,
+                address: `${city} - BA`,
+                types: [SchoolType.INFANTIL, SchoolType.FUNDAMENTAL_1],
+                image: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&q=80',
+                rating: 5.0,
+                availableSlots: 0,
+                lat: -12.5253,
+                lng: -40.2917
+             };
+        }
+        return { students: newStudents, school: newSchool };
     }
     return null;
   };
 
+  // --- Processing Logic ---
+
   const processFile = (file: File) => {
     setIsUploading(true);
     setUploadStatus('idle');
-    setErrorMessage('');
-    setSuccessMessage('');
+    setFeedbackMessage('');
     setUploadProgress(0);
+    setPreviewData(null);
+    setImportType(null);
+    setEducacensoSchool(null);
 
     const reader = new FileReader();
 
     reader.onprogress = (event) => {
       if (event.lengthComputable) {
-        const percent = Math.round((event.loaded / event.total) * 100);
-        setUploadProgress(percent);
+        setUploadProgress(Math.round((event.loaded / event.total) * 100));
       }
     };
 
@@ -288,76 +259,50 @@ export const AdminData: React.FC = () => {
       setTimeout(() => {
         try {
           const content = event.target?.result as string;
-          let count = 0;
-          let type = '';
-
+          
           if (file.name.endsWith('.json')) {
               const parsed = JSON.parse(content);
-              if (Array.isArray(parsed)) {
-                  if (parsed.length > 0 && ('availableSlots' in parsed[0] || 'lat' in parsed[0])) {
-                      updateSchools(parsed);
-                      count = parsed.length;
-                      type = 'escolas';
-                  } else if (parsed.length > 0 && ('cpf' in parsed[0] || 'name' in parsed[0] || 'nome' in parsed[0])) {
-                      updateStudents(parsed);
-                      count = parsed.length;
-                      type = 'alunos';
-                  }
-              }
-          } else if (file.name.endsWith('.csv') || content.includes('Ministério da Educação')) {
-              // Tenta processar como Educacenso primeiro se tiver os marcadores
-              if (content.includes('Ministério da Educação') || content.includes('Educacenso')) {
-                  const result = processEducacenso(content);
-                  if (result) {
-                     setSuccessMessage(`${result.count} alunos importados para a escola "${result.school}"${result.created ? ' (Nova escola criada)' : ''}.`);
-                     setUploadStatus('success');
-                     return;
-                  }
-              }
-
-              // Processamento Genérico de CSV
-              const parsedData = parseCSV(content);
+              if (Array.isArray(parsed)) throw new Error("Formato JSON inválido (esperado objeto com keys 'students' e 'schools')");
               
-              if (parsedData.length > 0) {
-                const firstRowKeys = Object.keys(parsedData[0]);
-                
-                // Detecção de Escolas vs Alunos
-                const isSchoolData = firstRowKeys.some(k => 
-                    ['lat', 'latitude', 'vagas', 'capacidade', 'endereco', 'address', 'tipo'].includes(k)
-                );
-                const isStudentData = firstRowKeys.some(k => 
-                    ['nascimento', 'datadenascimento', 'cpf', 'turma', 'aluno', 'nome'].includes(k)
-                );
+              if (parsed.schools) updateSchools(parsed.schools);
+              if (parsed.students) updateStudents(parsed.students);
+              setFeedbackMessage('Backup restaurado com sucesso!');
+              setUploadStatus('success');
 
-                if (isSchoolData) {
-                  count = processSchoolImport(parsedData);
-                  type = 'escolas';
-                } else if (isStudentData) {
-                  count = processStudentImport(parsedData);
-                  type = 'alunos';
-                } else {
-                   // Fallback: Se tem nome e não é escola, assume aluno
-                   if (firstRowKeys.some(k => k.includes('nome') || k.includes('name'))) {
-                      count = processStudentImport(parsedData);
-                      type = 'alunos (detectado)';
-                   }
-                }
+          } else if (file.name.endsWith('.csv') || content.includes('Ministério da Educação')) {
+              if (content.includes('Ministério da Educação') || content.includes('Educacenso')) {
+                  const result = processEducacensoRaw(content);
+                  if (result) {
+                      setPreviewData(result.students);
+                      setImportType('educacenso');
+                      setEducacensoSchool(result.school);
+                  } else {
+                      throw new Error("Nenhum aluno encontrado no arquivo do Educacenso.");
+                  }
+              } else {
+                  const parsedData = parseCSV(content);
+                  if (parsedData.length > 0) {
+                      const keys = Object.keys(parsedData[0]);
+                      const isSchool = keys.some(k => ['lat', 'latitude', 'capacidade'].includes(k));
+                      
+                      if (isSchool) {
+                          setPreviewData(mapSchoolsFromData(parsedData));
+                          setImportType('schools');
+                      } else {
+                          setPreviewData(mapStudentsFromData(parsedData));
+                          setImportType('students');
+                      }
+                  } else {
+                      throw new Error("Arquivo CSV vazio ou inválido.");
+                  }
               }
           } else {
-              throw new Error("Formato não suportado. Use .json ou .csv");
+              throw new Error("Formato não suportado.");
           }
-
-          if (count > 0) {
-            setSuccessMessage(`${count} registros de ${type} processados e cadastrados com sucesso!`);
-            setUploadStatus('success');
-          } else {
-            setUploadStatus('error');
-            setErrorMessage('Não foi possível identificar dados válidos no arquivo. Verifique o cabeçalho das colunas.');
-          }
-        } catch (error) {
+        } catch (error: any) {
           console.error("Import error:", error);
           setUploadStatus('error');
-          setErrorMessage('Erro ao ler o arquivo. Verifique a formatação e tente novamente.');
+          setFeedbackMessage(error.message || 'Erro ao ler o arquivo.');
         } finally {
           setIsUploading(false);
         }
@@ -366,18 +311,72 @@ export const AdminData: React.FC = () => {
 
     reader.onerror = () => {
       setUploadStatus('error');
-      setErrorMessage('Erro na leitura do arquivo.');
+      setFeedbackMessage('Erro de leitura.');
       setIsUploading(false);
     };
 
     reader.readAsText(file, 'ISO-8859-1');
   };
 
+  const confirmImport = () => {
+      if (!previewData) return;
+
+      if (importType === 'schools') {
+          updateSchools(previewData as School[]);
+          setFeedbackMessage(`${previewData.length} escolas importadas com sucesso.`);
+      } else if (importType === 'students') {
+          updateStudents(previewData as RegistryStudent[]);
+          setFeedbackMessage(`${previewData.length} alunos importados com sucesso.`);
+      } else if (importType === 'educacenso') {
+          if (educacensoSchool) {
+              updateSchools([educacensoSchool]);
+          }
+          updateStudents(previewData as RegistryStudent[]);
+          setFeedbackMessage(`${previewData.length} alunos do Educacenso importados.`);
+      }
+
+      setUploadStatus('success');
+      setPreviewData(null);
+      setImportType(null);
+  };
+
+  const cancelImport = () => {
+      setPreviewData(null);
+      setImportType(null);
+      setUploadStatus('idle');
+      setFeedbackMessage('');
+  };
+
+  const handleMassAllocation = () => {
+      if (!targetSchoolId) return;
+      
+      const targetSchool = schools.find(s => s.id === targetSchoolId);
+      if (!targetSchool) return;
+
+      const updatedStudents = students.map(student => {
+          if (!student.school || student.school === 'Não alocada') {
+              return { ...student, school: targetSchool.name, status: 'Matriculado' as const };
+          }
+          return student;
+      });
+      
+      const changedStudents = updatedStudents.filter((s, index) => s.school !== students[index].school);
+      
+      if (changedStudents.length > 0) {
+          updateStudents(changedStudents);
+          setAllocationMessage(`${changedStudents.length} alunos alocados para ${targetSchool.name}.`);
+          setTargetSchoolId('');
+          setTimeout(() => setAllocationMessage(''), 5000);
+      } else {
+          setAllocationMessage('Nenhum aluno precisava de alocação.');
+      }
+  };
+
+  // --- Handlers ---
+  
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-        processFile(file);
-    }
+    if (file) processFile(file);
     e.target.value = '';
   };
 
@@ -398,22 +397,16 @@ export const AdminData: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    
     const file = e.dataTransfer.files?.[0];
-    if (file) {
-        processFile(file);
-    }
+    if (file) processFile(file);
   };
 
   const handleBackup = () => {
-    const backupData = {
-      students,
-      schools
-    };
+    const backupData = { students, schools };
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", `backup_educamunicipio_${new Date().toISOString().slice(0,10)}.json`);
+    downloadAnchorNode.setAttribute("download", `backup_educa_${new Date().toISOString().slice(0,10)}.json`);
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
@@ -425,19 +418,25 @@ export const AdminData: React.FC = () => {
     setUploadProgress(0);
   };
 
-  // --- Student List Logic ---
+  // --- Filter Logic ---
   const filteredStudents = useMemo(() => {
     return students.filter(student => {
       const searchLower = searchTerm.toLowerCase().trim();
       const studentName = student.name.toLowerCase();
       const studentCpf = student.cpf.replace(/\D/g, '');
-      
-      const matchesSearch = studentName.includes(searchLower) || studentCpf.includes(searchLower);
-      const matchesSchool = schoolFilter === 'Todas' || student.school === schoolFilter;
+      const studentSchool = (student.school || '').toLowerCase();
 
-      return matchesSearch && matchesSchool;
+      const matchesSearch = studentName.includes(searchLower) || 
+                            studentCpf.includes(searchLower) ||
+                            studentSchool.includes(searchLower);
+                            
+      const matchesSchool = schoolFilter === 'Todas' || student.school === schoolFilter;
+      const matchesStatus = statusFilter === 'Todos' || student.status === statusFilter;
+      const matchesClass = classFilter === 'Todas' || student.className === classFilter;
+
+      return matchesSearch && matchesSchool && matchesStatus && matchesClass;
     });
-  }, [students, searchTerm, schoolFilter]);
+  }, [students, searchTerm, schoolFilter, statusFilter, classFilter]);
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -450,14 +449,88 @@ export const AdminData: React.FC = () => {
     <div className="min-h-screen bg-slate-50 py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-10">
-          <h1 className="text-3xl font-bold text-slate-900">Gestão de Dados e Backup</h1>
-          <p className="text-slate-600 mt-2">
-            Importe planilhas (.csv) para cadastrar <strong>Alunos</strong> ou <strong>Escolas</strong> automaticamente.
-          </p>
+          <h1 className="text-3xl font-bold text-slate-900">Gestão de Dados</h1>
+          <p className="text-slate-600 mt-2">Importe dados oficiais para popular o sistema.</p>
         </div>
 
+        {/* Preview Modal */}
+        {previewData && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[80vh] flex flex-col overflow-hidden">
+                    <div className="p-6 border-b border-slate-100 bg-slate-50">
+                        <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                            <Eye className="h-5 w-5 text-blue-600" />
+                            Revisão de Importação
+                        </h3>
+                        <p className="text-sm text-slate-500 mt-1">
+                            Foram encontrados <strong>{previewData.length}</strong> registros de <strong>{importType === 'schools' ? 'Escolas' : 'Alunos'}</strong>.
+                        </p>
+                        {educacensoSchool && (
+                             <div className="mt-3 text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded-lg border border-blue-100">
+                                <strong>Nova Escola Detectada:</strong> {educacensoSchool.name}
+                             </div>
+                        )}
+                    </div>
+                    <div className="p-0 overflow-auto flex-1 bg-slate-50/30">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-100 text-xs uppercase text-slate-600 font-semibold sticky top-0">
+                                <tr>
+                                    <th className="px-4 py-3">#</th>
+                                    {importType === 'schools' ? (
+                                        <>
+                                            <th className="px-4 py-3">Nome</th>
+                                            <th className="px-4 py-3">Endereço</th>
+                                            <th className="px-4 py-3">Vagas</th>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <th className="px-4 py-3">Nome</th>
+                                            <th className="px-4 py-3">CPF</th>
+                                            <th className="px-4 py-3">Turma</th>
+                                        </>
+                                    )}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {previewData.slice(0, 8).map((item, idx) => (
+                                    <tr key={idx} className="bg-white">
+                                        <td className="px-4 py-2.5 font-mono text-xs text-slate-400">{idx + 1}</td>
+                                        {importType === 'schools' ? (
+                                            <>
+                                                <td className="px-4 py-2.5 font-medium">{item.name}</td>
+                                                <td className="px-4 py-2.5 text-slate-500 truncate max-w-[200px]">{item.address}</td>
+                                                <td className="px-4 py-2.5 text-slate-500">{item.availableSlots}</td>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <td className="px-4 py-2.5 font-medium">{item.name}</td>
+                                                <td className="px-4 py-2.5 text-slate-500">{item.cpf}</td>
+                                                <td className="px-4 py-2.5 text-slate-500">{item.className || '-'}</td>
+                                            </>
+                                        )}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {previewData.length > 8 && (
+                            <div className="p-4 text-center text-xs text-slate-400 italic border-t border-slate-100 bg-white">
+                                ... e mais {previewData.length - 8} registros.
+                            </div>
+                        )}
+                    </div>
+                    <div className="p-4 border-t border-slate-100 bg-white flex justify-end gap-3">
+                        <button onClick={cancelImport} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium transition">Cancelar</button>
+                        <button onClick={confirmImport} className="px-6 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg shadow-green-200 transition">
+                            <Save className="h-4 w-4" />
+                            Confirmar Importação
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         <div className="grid md:grid-cols-2 gap-8 mb-10">
-          {/* Card Retroalimentação */}
+          {/* Upload Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col h-full">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-3 bg-blue-100 text-blue-600 rounded-lg">
@@ -511,7 +584,7 @@ export const AdminData: React.FC = () => {
                   <div className="relative mb-4">
                     <RefreshCw className="h-10 w-10 text-blue-600 animate-spin mx-auto" />
                   </div>
-                  <p className="text-blue-700 font-medium mb-2">Lendo arquivo...</p>
+                  <p className="text-blue-700 font-medium mb-2">Processando arquivo...</p>
                   <div className="w-full bg-blue-200 rounded-full h-2.5 overflow-hidden">
                     <div 
                       className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 animate-pulse" 
@@ -526,7 +599,7 @@ export const AdminData: React.FC = () => {
                       <Check className="h-8 w-8 text-green-600" />
                    </div>
                   <span className="font-bold text-lg">Sucesso!</span>
-                  <span className="text-sm mt-1 text-center font-medium px-2">{successMessage}</span>
+                  <span className="text-sm mt-1 text-center font-medium px-2">{feedbackMessage}</span>
                   <button 
                     onClick={resetUpload}
                     className="mt-6 px-6 py-2.5 bg-white border border-green-200 text-green-700 rounded-lg text-sm font-bold hover:bg-green-50 transition shadow-sm hover:shadow-md"
@@ -540,7 +613,7 @@ export const AdminData: React.FC = () => {
                       <AlertTriangle className="h-8 w-8 text-red-600" />
                    </div>
                   <span className="font-bold text-lg">Falha na Importação</span>
-                  <span className="text-sm mt-1 text-center max-w-[250px]">{errorMessage}</span>
+                  <span className="text-sm mt-1 text-center max-w-[250px]">{feedbackMessage}</span>
                   <button 
                     onClick={resetUpload}
                     className="mt-6 px-6 py-2.5 bg-white border border-red-200 text-red-700 rounded-lg text-sm font-bold hover:bg-red-50 transition shadow-sm hover:shadow-md"
@@ -560,7 +633,7 @@ export const AdminData: React.FC = () => {
             </div>
           </div>
 
-          {/* Card Backup */}
+          {/* Backup & Stats Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col h-full">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-3 bg-indigo-100 text-indigo-600 rounded-lg">
@@ -568,158 +641,150 @@ export const AdminData: React.FC = () => {
               </div>
               <h2 className="text-xl font-bold text-slate-800">Backup e Status</h2>
             </div>
-            <p className="text-slate-600 text-sm mb-6">
-              Visão geral dos dados ativos no sistema.
-            </p>
-
-            <div className="space-y-4 mb-8 flex-1">
-               <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 flex justify-between items-center transition hover:border-blue-200">
-                 <div className="flex items-center gap-3">
-                    <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
-                        <Users className="h-5 w-5" />
-                    </div>
-                    <div>
-                        <span className="text-sm font-medium text-slate-600 block">Alunos Cadastrados</span>
-                        <span className="text-xs text-slate-400">Inclui importados e matrículas novas</span>
-                    </div>
-                 </div>
-                 <span className="text-2xl font-bold text-slate-900">{students.length}</span>
+            
+            <div className="space-y-4 flex-1">
+               <div className="flex justify-between items-center p-4 bg-slate-50 rounded-lg border border-slate-100">
+                   <span className="text-slate-600 font-medium">Alunos</span>
+                   <span className="text-2xl font-bold text-slate-900">{students.length}</span>
                </div>
-               <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 flex justify-between items-center transition hover:border-green-200">
-                 <div className="flex items-center gap-3">
-                    <div className="bg-green-100 p-2 rounded-lg text-green-600">
-                        <SchoolIcon className="h-5 w-5" />
-                    </div>
-                    <span className="text-sm font-medium text-slate-600">Escolas Ativas</span>
-                 </div>
-                 <span className="text-2xl font-bold text-slate-900">{schools.length}</span>
+               <div className="flex justify-between items-center p-4 bg-slate-50 rounded-lg border border-slate-100">
+                   <span className="text-slate-600 font-medium">Escolas</span>
+                   <span className="text-2xl font-bold text-slate-900">{schools.length}</span>
                </div>
+               
+               {/* Mass Allocation Section */}
+               {unallocatedCount > 0 && (
+                   <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-100 mt-4">
+                       <div className="flex items-center gap-2 text-yellow-800 font-bold text-sm mb-2">
+                           <AlertTriangle className="h-4 w-4" />
+                           {unallocatedCount} Alunos sem escola
+                       </div>
+                       <p className="text-xs text-yellow-700 mb-3">Alunos pendentes de alocação.</p>
+                       <div className="flex gap-2">
+                            <select 
+                                value={targetSchoolId}
+                                onChange={(e) => setTargetSchoolId(e.target.value)}
+                                className="flex-1 text-xs border border-yellow-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-yellow-500 outline-none"
+                            >
+                                <option value="">Selecione escola destino...</option>
+                                {schools.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                            </select>
+                            <button 
+                                onClick={handleMassAllocation}
+                                disabled={!targetSchoolId}
+                                className="bg-yellow-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-yellow-700 disabled:opacity-50 transition flex items-center gap-1"
+                            >
+                                <UserPlus className="h-3 w-3" /> Alocar
+                            </button>
+                       </div>
+                       {allocationMessage && <p className="text-xs text-green-700 mt-2 font-medium">{allocationMessage}</p>}
+                   </div>
+               )}
             </div>
 
-            <div className="flex flex-col gap-3 mt-auto">
-                <button 
-                onClick={handleBackup}
-                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-medium transition shadow-lg shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-0.5 transform duration-200"
-                >
-                <Download className="h-5 w-5" />
-                Baixar Backup Completo (JSON)
+            <div className="flex flex-col gap-3 mt-6">
+                <button onClick={handleBackup} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+                    <Download className="h-4 w-4" /> Backup Completo
                 </button>
-                
-                <button 
-                  onClick={resetData}
-                  className="w-full flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 py-2.5 rounded-xl font-medium transition text-sm mt-2"
-                >
-                  <X className="h-4 w-4" />
-                  Zerar Base de Dados
-                </button>
+                <button onClick={resetData} className="w-full py-2 text-red-600 hover:bg-red-50 rounded-xl text-sm transition">Zerar Dados</button>
             </div>
           </div>
         </div>
 
-        {/* Lista de Alunos (Data Inspection) */}
+        {/* Data Table */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50">
-            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-               <Users className="h-5 w-5 text-slate-500" />
-               Lista de Alunos ({filteredStudents.length})
-            </h3>
-            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input 
-                    type="text" 
-                    placeholder="Buscar por nome ou CPF..." 
-                    value={searchTerm}
-                    onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                    className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                />
+            <div className="p-6 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users className="h-5 w-5" /> Alunos Cadastrados</h3>
+                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                    <div className="relative flex-grow sm:flex-grow-0">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input 
+                            type="text" 
+                            placeholder="Buscar..." 
+                            value={searchTerm} 
+                            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                            className="w-full sm:w-48 pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                    </div>
+                    
+                    {/* Filter Group */}
+                    <div className="flex gap-2">
+                        <select 
+                            value={schoolFilter} 
+                            onChange={(e) => { setSchoolFilter(e.target.value); setCurrentPage(1); }}
+                            className="pl-2 pr-8 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                        >
+                            <option value="Todas">Escolas: Todas</option>
+                            {schoolNames.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+
+                        <select 
+                            value={statusFilter} 
+                            onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+                            className="pl-2 pr-8 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                        >
+                            <option value="Todos">Status: Todos</option>
+                            <option value="Matriculado">Matriculado</option>
+                            <option value="Pendente">Pendente</option>
+                            <option value="Em Análise">Em Análise</option>
+                        </select>
+
+                         <select 
+                            value={classFilter} 
+                            onChange={(e) => { setClassFilter(e.target.value); setCurrentPage(1); }}
+                            className="pl-2 pr-8 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                        >
+                            <option value="Todas">Turmas: Todas</option>
+                            {classNames.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
                 </div>
-                <div className="relative w-full sm:w-48">
-                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <select
-                        value={schoolFilter}
-                        onChange={(e) => { setSchoolFilter(e.target.value); setCurrentPage(1); }}
-                        className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white"
-                    >
-                        <option value="Todas">Todas as Escolas</option>
-                        {schoolNames.map(school => (
-                            <option key={school} value={school}>{school}</option>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left text-slate-600">
+                    <thead className="bg-slate-100 text-xs uppercase text-slate-700">
+                        <tr>
+                            <th className="px-6 py-3">Nome</th>
+                            <th className="px-6 py-3">CPF</th>
+                            <th className="px-6 py-3">Escola</th>
+                            <th className="px-6 py-3">Turma</th>
+                            <th className="px-6 py-3">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {currentItems.map(s => (
+                            <tr key={s.id} className="hover:bg-slate-50">
+                                <td className="px-6 py-4 font-medium text-slate-900">{s.name}</td>
+                                <td className="px-6 py-4">{s.cpf}</td>
+                                <td className="px-6 py-4">{s.school || '-'}</td>
+                                <td className="px-6 py-4">{s.className || '-'}</td>
+                                <td className="px-6 py-4">
+                                     <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase border ${
+                                        s.status === 'Matriculado' ? 'bg-green-50 text-green-700 border-green-200' :
+                                        s.status === 'Pendente' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                                        'bg-blue-50 text-blue-700 border-blue-200'
+                                    }`}>
+                                    {s.status}
+                                    </span>
+                                </td>
+                            </tr>
                         ))}
-                    </select>
+                        {currentItems.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400">Nenhum registro encontrado.</td></tr>}
+                    </tbody>
+                </table>
+            </div>
+            {/* Pagination Controls */}
+            {filteredStudents.length > itemsPerPage && (
+                <div className="p-4 border-t border-slate-200 flex justify-between items-center bg-slate-50">
+                    <span className="text-xs text-slate-500">Página {currentPage} de {totalPages}</span>
+                    <div className="flex gap-2">
+                        <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 border rounded hover:bg-white disabled:opacity-50"><ChevronLeft className="h-4 w-4" /></button>
+                        <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 border rounded hover:bg-white disabled:opacity-50"><ChevronRight className="h-4 w-4" /></button>
+                    </div>
                 </div>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left text-slate-600">
-              <thead className="text-xs text-slate-700 uppercase bg-slate-100/50 border-b border-slate-200">
-                <tr>
-                  <th className="px-6 py-3 font-semibold">ID</th>
-                  <th className="px-6 py-3 font-semibold">Nome</th>
-                  <th className="px-6 py-3 font-semibold">CPF</th>
-                  <th className="px-6 py-3 font-semibold">Escola / Turma</th>
-                  <th className="px-6 py-3 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentItems.length > 0 ? (
-                  currentItems.map((student) => (
-                    <tr key={student.id} className="bg-white border-b border-slate-100 hover:bg-slate-50 transition">
-                      <td className="px-6 py-4 font-mono text-slate-500 text-xs">{student.id}</td>
-                      <td className="px-6 py-4 font-medium text-slate-900">{student.name}</td>
-                      <td className="px-6 py-4">{student.cpf || '-'}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="text-slate-900 font-medium">{student.school || 'Não alocada'}</span>
-                          <span className="text-xs text-slate-500">{student.className || student.grade}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase border ${
-                          student.status === 'Matriculado' ? 'bg-green-50 text-green-700 border-green-200' :
-                          student.status === 'Pendente' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-                          'bg-blue-50 text-blue-700 border-blue-200'
-                        }`}>
-                          {student.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
-                      Nenhum aluno encontrado com os critérios de busca.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {filteredStudents.length > itemsPerPage && (
-            <div className="flex justify-between items-center p-4 border-t border-slate-200 bg-slate-50">
-              <span className="text-xs text-slate-500">
-                Mostrando {indexOfFirstItem + 1} a {Math.min(indexOfLastItem, filteredStudents.length)} de {filteredStudents.length} resultados
-              </span>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => paginate(currentPage - 1)} 
-                  disabled={currentPage === 1}
-                  className="p-2 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:hover:bg-transparent transition"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button 
-                  onClick={() => paginate(currentPage + 1)} 
-                  disabled={currentPage === totalPages}
-                  className="p-2 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:hover:bg-transparent transition"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          )}
+            )}
         </div>
       </div>
     </div>
