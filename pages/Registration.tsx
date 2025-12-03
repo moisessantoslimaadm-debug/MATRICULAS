@@ -1,11 +1,13 @@
 
 import React, { useState, useMemo } from 'react';
-import { INITIAL_REGISTRATION_STATE, MOCK_SCHOOLS } from '../constants';
+import { INITIAL_REGISTRATION_STATE } from '../constants';
+import { useData } from '../contexts/DataContext';
 import { RegistrationFormState, School } from '../types';
 import { Check, ChevronRight, ChevronLeft, Upload, School as SchoolIcon, Bus, FileText, ListChecks, MapPin, Navigation } from 'lucide-react';
 import { useNavigate } from '../router';
 
 export const Registration: React.FC = () => {
+  const { schools } = useData(); // Use schools from context
   const [formState, setFormState] = useState<RegistrationFormState>(INITIAL_REGISTRATION_STATE);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
@@ -35,7 +37,6 @@ export const Registration: React.FC = () => {
   };
 
   // Mock geocoding service (since we don't have a real API key for Maps in this context)
-  // In a real app, this would call Google Maps Geocoding API based on the address string
   const simulateGeocoding = () => {
     // Returns a fixed coordinate in the middle of our mock schools for demonstration
     return { lat: -23.562000, lng: -46.645000 }; 
@@ -69,9 +70,9 @@ export const Registration: React.FC = () => {
 
   // Calculate and sort schools by distance when on Step 4
   const sortedSchools = useMemo(() => {
-    if (formState.step !== 4 || !formState.address.lat || !formState.address.lng) return MOCK_SCHOOLS;
+    if (formState.step !== 4 || !formState.address.lat || !formState.address.lng) return schools;
 
-    const schoolsWithDistance = MOCK_SCHOOLS.map(school => ({
+    const schoolsWithDistance = schools.map(school => ({
       ...school,
       distance: calculateDistance(
         formState.address.lat!, 
@@ -82,7 +83,7 @@ export const Registration: React.FC = () => {
     }));
 
     return schoolsWithDistance.sort((a, b) => a.distance - b.distance);
-  }, [formState.step, formState.address.lat, formState.address.lng]);
+  }, [formState.step, formState.address.lat, formState.address.lng, schools]);
 
   const StepIndicator = () => (
     <div className="flex justify-between mb-8 relative">

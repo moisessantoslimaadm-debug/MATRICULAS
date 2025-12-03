@@ -2,10 +2,11 @@
 import React, { useState } from 'react';
 import { useSearchParams, Link } from '../router';
 import { CheckCircle, FileText, Search, UserCheck, AlertCircle, Bus, GraduationCap, School, Clock, Hash } from 'lucide-react';
-import { MOCK_STUDENT_REGISTRY } from '../constants';
+import { useData } from '../contexts/DataContext';
 import { RegistryStudent } from '../types';
 
 export const Status: React.FC = () => {
+  const { students } = useData(); // Use students from context
   const [searchParams] = useSearchParams();
   const isSuccess = searchParams.get('success') === 'true';
   const [activeTab, setActiveTab] = useState<'protocol' | 'student'>('protocol');
@@ -25,7 +26,7 @@ export const Status: React.FC = () => {
     // Remove punctuation from input for flexible CPF search
     const cleanTerm = term.replace(/[^\w\s]/gi, '');
 
-    const found = MOCK_STUDENT_REGISTRY.find(s => {
+    const found = students.find(s => {
       const cleanCpf = s.cpf.replace(/[^\w\s]/gi, '');
       return s.name.toLowerCase().includes(term) || (cleanCpf && cleanCpf.includes(cleanTerm));
     });

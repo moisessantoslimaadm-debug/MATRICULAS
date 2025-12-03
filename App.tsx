@@ -8,6 +8,7 @@ import { Status } from './pages/Status';
 import { AdminData } from './pages/AdminData';
 import { ChatAssistant } from './components/ChatAssistant';
 import { HashRouter, Routes, Route, useLocation } from './router';
+import { DataProvider } from './contexts/DataContext';
 
 const Footer: React.FC = () => (
   <footer className="bg-slate-900 text-slate-400 py-12">
@@ -58,23 +59,25 @@ const ScrollToTop = () => {
 
 const App: React.FC = () => {
   return (
-    <HashRouter>
-      <ScrollToTop />
-      <div className="flex flex-col min-h-screen">
-        <Navbar />
-        <main className="flex-grow">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/registration" element={<Registration />} />
-            <Route path="/schools" element={<SchoolList />} />
-            <Route path="/status" element={<Status />} />
-            <Route path="/admin/data" element={<AdminData />} />
-          </Routes>
-        </main>
-        <Footer />
-        <ChatAssistant />
-      </div>
-    </HashRouter>
+    <DataProvider>
+      <HashRouter>
+        <ScrollToTop />
+        <div className="flex flex-col min-h-screen">
+          <Navbar />
+          <main className="flex-grow">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/registration" element={<Registration />} />
+              <Route path="/schools" element={<SchoolList />} />
+              <Route path="/status" element={<Status />} />
+              <Route path="/admin/data" element={<AdminData />} />
+            </Routes>
+          </main>
+          <Footer />
+          <ChatAssistant />
+        </div>
+      </HashRouter>
+    </DataProvider>
   );
 };
 

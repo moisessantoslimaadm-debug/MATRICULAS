@@ -1,15 +1,16 @@
 
 import React, { useState } from 'react';
-import { MOCK_SCHOOLS } from '../constants';
+import { useData } from '../contexts/DataContext';
 import { MapPin, Star, Users, Search, Map as MapIcon, List } from 'lucide-react';
 import { SchoolType } from '../types';
 
 export const SchoolList: React.FC = () => {
+  const { schools } = useData(); // Get schools from Context
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('Todos');
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
-  const filteredSchools = MOCK_SCHOOLS.filter(school => {
+  const filteredSchools = schools.filter(school => {
     const matchesSearch = school.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           school.address.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === 'Todos' || school.types.includes(filterType as SchoolType);
