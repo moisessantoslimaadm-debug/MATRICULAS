@@ -18,6 +18,7 @@ export interface School {
   availableSlots: number;
   lat: number;
   lng: number;
+  distance?: number; // Property for calculated distance
 }
 
 export interface StudentData {
@@ -44,6 +45,8 @@ export interface AddressData {
   neighborhood: string;
   city: string; // Defaults to the municipality
   zipCode: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface RegistrationFormState {

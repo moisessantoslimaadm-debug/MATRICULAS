@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { INITIAL_REGISTRATION_STATE, MOCK_SCHOOLS } from '../constants';
-import { RegistrationFormState, SchoolType } from '../types';
-import { Check, ChevronRight, ChevronLeft, Upload, School as SchoolIcon, Bus, FileText, ListChecks } from 'lucide-react';
+import { RegistrationFormState, School } from '../types';
+import { Check, ChevronRight, ChevronLeft, Upload, School as SchoolIcon, Bus, FileText, ListChecks, MapPin, Navigation } from 'lucide-react';
 import { useNavigate } from '../router';
 
 export const Registration: React.FC = () => {
@@ -20,7 +20,41 @@ export const Registration: React.FC = () => {
     }));
   };
 
-  const nextStep = () => setFormState(prev => ({ ...prev, step: prev.step + 1 }));
+  // Haversine formula to calculate distance in km
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+    const d = R * c; // Distance in km
+    return d;
+  };
+
+  // Mock geocoding service (since we don't have a real API key for Maps in this context)
+  // In a real app, this would call Google Maps Geocoding API based on the address string
+  const simulateGeocoding = () => {
+    // Returns a fixed coordinate in the middle of our mock schools for demonstration
+    return { lat: -23.562000, lng: -46.645000 }; 
+  };
+
+  const nextStep = () => {
+    if (formState.step === 3) {
+      // Simulate getting coordinates from the address
+      const coords = simulateGeocoding();
+      setFormState(prev => ({
+        ...prev,
+        address: { ...prev.address, lat: coords.lat, lng: coords.lng },
+        step: prev.step + 1
+      }));
+    } else {
+      setFormState(prev => ({ ...prev, step: prev.step + 1 }));
+    }
+  };
+
   const prevStep = () => setFormState(prev => ({ ...prev, step: prev.step - 1 }));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,6 +66,23 @@ export const Registration: React.FC = () => {
       navigate('/status?success=true');
     }, 2000);
   };
+
+  // Calculate and sort schools by distance when on Step 4
+  const sortedSchools = useMemo(() => {
+    if (formState.step !== 4 || !formState.address.lat || !formState.address.lng) return MOCK_SCHOOLS;
+
+    const schoolsWithDistance = MOCK_SCHOOLS.map(school => ({
+      ...school,
+      distance: calculateDistance(
+        formState.address.lat!, 
+        formState.address.lng!, 
+        school.lat, 
+        school.lng
+      )
+    }));
+
+    return schoolsWithDistance.sort((a, b) => a.distance - b.distance);
+  }, [formState.step, formState.address.lat, formState.address.lng]);
 
   const StepIndicator = () => (
     <div className="flex justify-between mb-8 relative">
@@ -332,35 +383,58 @@ export const Registration: React.FC = () => {
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                 <h3 className="text-lg font-semibold text-slate-800 border-b pb-2">Seleção de Preferência</h3>
                 <p className="text-sm text-slate-600 mb-4">
-                  Selecione a escola de sua preferência. A vaga será confirmada baseada na proximidade e disponibilidade.
+                  Com base no seu endereço, calculamos a distância para as unidades escolares.
+                  Selecione a escola de sua preferência.
                 </p>
                 
                 <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                  {MOCK_SCHOOLS.map((school) => (
-                    <div 
-                      key={school.id}
-                      onClick={() => setFormState(prev => ({ ...prev, selectedSchoolId: school.id }))}
-                      className={`p-4 rounded-xl border-2 cursor-pointer transition flex items-center justify-between ${
-                        formState.selectedSchoolId === school.id 
-                          ? 'border-blue-600 bg-blue-50' 
-                          : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="bg-white p-2 rounded-lg border border-slate-100">
-                          <SchoolIcon className="h-6 w-6 text-blue-600" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-slate-900">{school.name}</h4>
-                          <p className="text-sm text-slate-500">{school.address}</p>
-                          <div className="flex gap-1 mt-1">
-                             {school.types.map(t => <span key={t} className="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600">{t}</span>)}
+                  {sortedSchools.map((school, index) => {
+                    const isNearest = index < 3 && school.distance !== undefined;
+                    
+                    return (
+                      <div 
+                        key={school.id}
+                        onClick={() => setFormState(prev => ({ ...prev, selectedSchoolId: school.id }))}
+                        className={`p-4 rounded-xl border-2 cursor-pointer transition relative ${
+                          formState.selectedSchoolId === school.id 
+                            ? 'border-blue-600 bg-blue-50' 
+                            : isNearest 
+                              ? 'border-green-200 bg-green-50/30 hover:border-green-300 hover:bg-green-50'
+                              : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {isNearest && (
+                          <div className="absolute -top-2.5 right-4 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
+                             <Navigation className="h-3 w-3" /> Recomendada
                           </div>
+                        )}
+
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className={`p-2 rounded-lg border ${isNearest ? 'bg-white border-green-100' : 'bg-white border-slate-100'}`}>
+                              <SchoolIcon className={`h-6 w-6 ${isNearest ? 'text-green-600' : 'text-blue-600'}`} />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-slate-900">{school.name}</h4>
+                              <p className="text-sm text-slate-500 flex items-center gap-1">
+                                {school.distance !== undefined && (
+                                  <span className="font-medium text-slate-700 bg-slate-100 px-1.5 rounded flex items-center gap-0.5">
+                                    <MapPin className="h-3 w-3" />
+                                    {school.distance.toFixed(2)} km
+                                  </span>
+                                )}
+                                <span className="truncate max-w-[180px]">{school.address}</span>
+                              </p>
+                              <div className="flex gap-1 mt-1">
+                                {school.types.map(t => <span key={t} className="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600">{t}</span>)}
+                              </div>
+                            </div>
+                          </div>
+                          {formState.selectedSchoolId === school.id && <Check className="h-6 w-6 text-blue-600" />}
                         </div>
                       </div>
-                      {formState.selectedSchoolId === school.id && <Check className="h-6 w-6 text-blue-600" />}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
