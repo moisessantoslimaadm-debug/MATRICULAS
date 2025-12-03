@@ -7,6 +7,7 @@ interface DataContextType {
   schools: School[];
   students: RegistryStudent[];
   addSchool: (school: School) => void;
+  addStudent: (student: RegistryStudent) => void;
   updateSchools: (newSchools: School[]) => void;
   updateStudents: (newStudents: RegistryStudent[]) => void;
   resetData: () => void;
@@ -39,10 +40,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setSchools(prev => [...prev, school]);
   };
 
+  const addStudent = (student: RegistryStudent) => {
+    setStudents(prev => [...prev, student]);
+  };
+
   const updateSchools = (newSchools: School[]) => {
     // Mescla as novas escolas com as existentes ou substitui, dependendo da lógica desejada.
-    // Aqui vamos substituir para permitir importação em massa limpa, ou concatenar se preferir.
-    // Vamos concatenar filtrando duplicatas por ID/INEP
+    // Aqui vamos concatenar filtrando duplicatas por ID
     setSchools(prev => {
       const existingIds = new Set(prev.map(s => s.id));
       const uniqueNewSchools = newSchools.filter(s => !existingIds.has(s.id));
@@ -66,7 +70,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <DataContext.Provider value={{ schools, students, addSchool, updateSchools, updateStudents, resetData }}>
+    <DataContext.Provider value={{ schools, students, addSchool, addStudent, updateSchools, updateStudents, resetData }}>
       {children}
     </DataContext.Provider>
   );

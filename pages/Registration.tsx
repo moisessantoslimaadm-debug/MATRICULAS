@@ -2,12 +2,12 @@
 import React, { useState, useMemo } from 'react';
 import { INITIAL_REGISTRATION_STATE } from '../constants';
 import { useData } from '../contexts/DataContext';
-import { RegistrationFormState, School } from '../types';
-import { Check, ChevronRight, ChevronLeft, Upload, School as SchoolIcon, Bus, FileText, ListChecks, MapPin, Navigation } from 'lucide-react';
+import { RegistrationFormState, RegistryStudent } from '../types';
+import { Check, ChevronRight, ChevronLeft, Upload, School as SchoolIcon, Bus, FileText, ListChecks, MapPin, Navigation, AlertCircle } from 'lucide-react';
 import { useNavigate } from '../router';
 
 export const Registration: React.FC = () => {
-  const { schools } = useData(); // Use schools from context
+  const { schools, addStudent } = useData(); // Use schools and addStudent from context
   const [formState, setFormState] = useState<RegistrationFormState>(INITIAL_REGISTRATION_STATE);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
@@ -36,9 +36,9 @@ export const Registration: React.FC = () => {
     return d;
   };
 
-  // Mock geocoding service (since we don't have a real API key for Maps in this context)
+  // Mock geocoding service
   const simulateGeocoding = () => {
-    // Returns a fixed coordinate in the middle of our mock schools for demonstration
+    // Returns a fixed coordinate in the middle of typical municipality area
     return { lat: -23.562000, lng: -46.645000 }; 
   };
 
@@ -61,11 +61,30 @@ export const Registration: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Simulate API call
+
+    // Create a new student object
+    const selectedSchool = schools.find(s => s.id === formState.selectedSchoolId);
+    
+    const newStudent: RegistryStudent = {
+        id: Date.now().toString(), // Generate a temporary ID
+        name: formState.student.fullName.toUpperCase(),
+        birthDate: formState.student.birthDate.split('-').reverse().join('/'), // Format to DD/MM/YYYY
+        cpf: formState.student.cpf || '',
+        status: 'Em Análise',
+        school: selectedSchool ? selectedSchool.name : 'Não alocada',
+        grade: 'Definição Pendente', // Será definido pela secretaria
+        shift: 'Definição Pendente',
+        transportRequest: formState.student.needsTransport,
+        specialNeeds: formState.student.needsSpecialEducation,
+        enrollmentId: `PROT-${Math.floor(Math.random() * 100000)}` // Generate protocol
+    };
+
+    // Simulate API delay
     setTimeout(() => {
+      addStudent(newStudent); // Save to Global Context
       setIsSubmitting(false);
       navigate('/status?success=true');
-    }, 2000);
+    }, 1500);
   };
 
   // Calculate and sort schools by distance when on Step 4
@@ -389,53 +408,60 @@ export const Registration: React.FC = () => {
                 </p>
                 
                 <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                  {sortedSchools.map((school, index) => {
-                    const isNearest = index < 3 && school.distance !== undefined;
-                    
-                    return (
-                      <div 
-                        key={school.id}
-                        onClick={() => setFormState(prev => ({ ...prev, selectedSchoolId: school.id }))}
-                        className={`p-4 rounded-xl border-2 cursor-pointer transition relative ${
-                          formState.selectedSchoolId === school.id 
-                            ? 'border-blue-600 bg-blue-50' 
-                            : isNearest 
-                              ? 'border-green-200 bg-green-50/30 hover:border-green-300 hover:bg-green-50'
-                              : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
-                        }`}
-                      >
-                        {isNearest && (
-                          <div className="absolute -top-2.5 right-4 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
-                             <Navigation className="h-3 w-3" /> Recomendada
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className={`p-2 rounded-lg border ${isNearest ? 'bg-white border-green-100' : 'bg-white border-slate-100'}`}>
-                              <SchoolIcon className={`h-6 w-6 ${isNearest ? 'text-green-600' : 'text-blue-600'}`} />
+                  {sortedSchools.length === 0 ? (
+                    <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-4 flex items-center gap-3 text-yellow-800">
+                       <AlertCircle className="h-5 w-5" />
+                       <p className="text-sm">Não foram encontradas escolas cadastradas no sistema. Você pode prosseguir com a matrícula para ficar em lista de espera na zona de zoneamento.</p>
+                    </div>
+                  ) : (
+                    sortedSchools.map((school, index) => {
+                      const isNearest = index < 3 && school.distance !== undefined;
+                      
+                      return (
+                        <div 
+                          key={school.id}
+                          onClick={() => setFormState(prev => ({ ...prev, selectedSchoolId: school.id }))}
+                          className={`p-4 rounded-xl border-2 cursor-pointer transition relative ${
+                            formState.selectedSchoolId === school.id 
+                              ? 'border-blue-600 bg-blue-50' 
+                              : isNearest 
+                                ? 'border-green-200 bg-green-50/30 hover:border-green-300 hover:bg-green-50'
+                                : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          {isNearest && (
+                            <div className="absolute -top-2.5 right-4 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
+                               <Navigation className="h-3 w-3" /> Recomendada
                             </div>
-                            <div>
-                              <h4 className="font-semibold text-slate-900">{school.name}</h4>
-                              <p className="text-sm text-slate-500 flex items-center gap-1">
-                                {school.distance !== undefined && (
-                                  <span className="font-medium text-slate-700 bg-slate-100 px-1.5 rounded flex items-center gap-0.5">
-                                    <MapPin className="h-3 w-3" />
-                                    {school.distance.toFixed(2)} km
-                                  </span>
-                                )}
-                                <span className="truncate max-w-[180px]">{school.address}</span>
-                              </p>
-                              <div className="flex gap-1 mt-1">
-                                {school.types.map(t => <span key={t} className="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600">{t}</span>)}
+                          )}
+
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className={`p-2 rounded-lg border ${isNearest ? 'bg-white border-green-100' : 'bg-white border-slate-100'}`}>
+                                <SchoolIcon className={`h-6 w-6 ${isNearest ? 'text-green-600' : 'text-blue-600'}`} />
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-slate-900">{school.name}</h4>
+                                <p className="text-sm text-slate-500 flex items-center gap-1">
+                                  {school.distance !== undefined && (
+                                    <span className="font-medium text-slate-700 bg-slate-100 px-1.5 rounded flex items-center gap-0.5">
+                                      <MapPin className="h-3 w-3" />
+                                      {school.distance.toFixed(2)} km
+                                    </span>
+                                  )}
+                                  <span className="truncate max-w-[180px]">{school.address}</span>
+                                </p>
+                                <div className="flex gap-1 mt-1">
+                                  {school.types.map(t => <span key={t} className="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600">{t}</span>)}
+                                </div>
                               </div>
                             </div>
+                            {formState.selectedSchoolId === school.id && <Check className="h-6 w-6 text-blue-600" />}
                           </div>
-                          {formState.selectedSchoolId === school.id && <Check className="h-6 w-6 text-blue-600" />}
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </div>
             )}
@@ -464,7 +490,8 @@ export const Registration: React.FC = () => {
               ) : (
                 <button
                   type="submit"
-                  disabled={!formState.selectedSchoolId || isSubmitting}
+                  // Allow submit even if no school is selected if there are no schools (fallback logic)
+                  disabled={(!formState.selectedSchoolId && sortedSchools.length > 0) || isSubmitting}
                   className="flex items-center px-8 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 shadow-md shadow-green-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? 'Enviando...' : 'Confirmar Matrícula'}
