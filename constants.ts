@@ -1,3 +1,4 @@
+
 import { School, SchoolType, RegistryStudent, RegistrationFormState } from './types';
 
 export const MUNICIPALITY_NAME = "São Futuro";
@@ -57,6 +58,61 @@ export const MOCK_SCHOOLS: School[] = [
     availableSlots: 10,
     lat: -23.554520,
     lng: -46.637308
+  },
+  {
+    id: 'sch_06',
+    name: 'Escola Municipal Cecília Meireles',
+    address: 'Praça da Cultura, 10 - Centro',
+    types: [SchoolType.FUNDAMENTAL_1, SchoolType.EJA],
+    image: 'https://images.unsplash.com/photo-1544396821-4dd40b938ad3?auto=format&fit=crop&q=80',
+    rating: 4.6,
+    availableSlots: 8,
+    lat: -23.555520,
+    lng: -46.638308
+  },
+  {
+    id: 'sch_07',
+    name: 'CMEI Aquarela',
+    address: 'Av. das Nações, 330 - Zona Norte',
+    types: [SchoolType.INFANTIL],
+    image: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80',
+    rating: 4.3,
+    availableSlots: 60,
+    lat: -23.556520,
+    lng: -46.639308
+  },
+  {
+    id: 'sch_08',
+    name: 'Escola Municipal Paulo Freire',
+    address: 'Estrada do Campo, KM 12 - Zona Rural',
+    types: [SchoolType.FUNDAMENTAL_1, SchoolType.FUNDAMENTAL_2],
+    image: 'https://images.unsplash.com/photo-1577896235296-0150056d1bb3?auto=format&fit=crop&q=80',
+    rating: 4.8,
+    availableSlots: 100,
+    lat: -23.557520,
+    lng: -46.640308
+  },
+  {
+    id: 'sch_09',
+    name: 'Colégio Municipal Tiradentes',
+    address: 'Rua da Liberdade, 1822 - Independência',
+    types: [SchoolType.FUNDAMENTAL_2, SchoolType.MEDIO],
+    image: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&q=80',
+    rating: 4.4,
+    availableSlots: 25,
+    lat: -23.558520,
+    lng: -46.641308
+  },
+  {
+    id: 'sch_10',
+    name: 'CMEI Primeiros Voos',
+    address: 'Rua dos Pássaros, 88 - Bosque',
+    types: [SchoolType.INFANTIL],
+    image: 'https://images.unsplash.com/photo-1587691592099-24045742c181?auto=format&fit=crop&q=80',
+    rating: 5.0,
+    availableSlots: 5,
+    lat: -23.559520,
+    lng: -46.642308
   }
 ];
 
@@ -196,7 +252,7 @@ export const MOCK_STUDENT_REGISTRY: RegistryStudent[] = [
   { id: '215487983710', name: 'APOLLO LEANDRO MARQUES DOS SANTOS', birthDate: '08/10/2020', cpf: '12209571510', status: 'Matriculado', grade: 'Educação Infantil' },
   { id: '215491901561', name: 'ZOEY MAYA SILVA ROCHA', birthDate: '02/12/2020', cpf: '12243334542', status: 'Matriculado', grade: 'Educação Infantil' },
   { id: '215570139930', name: 'MIRELLA FRANCYELLE FRAGA DE DEUS', birthDate: '30/06/2020', cpf: '12082292576', status: 'Matriculado', grade: 'Educação Infantil' },
-  { id: '215707597407', name: 'LEVI SANTANA SOARES', birthDate: '20/01/2021', cpf: '12290948578', status: 'Matriculado', grade: 'Educação Infantil' },
+  { id: '215707597407', name: 'LEVY SANTANA SOARES', birthDate: '20/01/2021', cpf: '12290948578', status: 'Matriculado', grade: 'Educação Infantil' },
   { id: '215901410163', name: 'LAVINIA VICTORIA ASSIS DE SOUZA', birthDate: '19/05/2019', cpf: '11308057512', status: 'Matriculado', grade: 'Educação Infantil' },
   { id: '216228214916', name: 'ANTONIO MARCOS MODESTO DE SOUZA DIAS SANTOS', birthDate: '28/04/2020', cpf: '11992063508', status: 'Matriculado', grade: 'Educação Infantil' },
   { id: '216250492346', name: 'GAEL DE JESUS BARRETO', birthDate: '10/08/2020', cpf: '12140707524', status: 'Matriculado', grade: 'Educação Infantil' },

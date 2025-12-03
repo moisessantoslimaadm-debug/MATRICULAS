@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { INITIAL_REGISTRATION_STATE, MOCK_SCHOOLS } from '../constants';
 import { RegistrationFormState, SchoolType } from '../types';
-import { Check, ChevronRight, ChevronLeft, Upload, School as SchoolIcon, Bus } from 'lucide-react';
+import { Check, ChevronRight, ChevronLeft, Upload, School as SchoolIcon, Bus, FileText, ListChecks } from 'lucide-react';
 import { useNavigate } from '../App';
 
 export const Registration: React.FC = () => {
@@ -59,6 +59,50 @@ export const Registration: React.FC = () => {
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <h2 className="text-2xl font-bold text-slate-900 mb-6 text-center">Ficha de Matrícula</h2>
           
+          {/* Section: Documentação Necessária */}
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-blue-100 rounded-lg text-blue-600 hidden sm:block">
+                <FileText className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                  <ListChecks className="h-5 w-5 sm:hidden" />
+                  Documentação Necessária
+                </h3>
+                <p className="text-sm text-blue-700 mb-4">
+                  Para efetivar a matrícula, tenha em mãos (originais e cópias) os seguintes documentos para apresentar na escola selecionada:
+                </p>
+                <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-2 text-sm text-blue-800 font-medium">
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-blue-500" /> Certidão de Nascimento ou RG do Aluno
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-blue-500" /> CPF do Aluno (se houver)
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-blue-500" /> RG e CPF do Responsável
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-blue-500" /> Comprovante de Residência Atualizado
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-blue-500" /> Cartão de Vacinação Atualizado
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-blue-500" /> Cartão do SUS
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-blue-500" /> Número do NIS (se beneficiário)
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-blue-500" /> Laudo Médico (para alunos com deficiência)
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           <StepIndicator />
 
           <form onSubmit={handleSubmit}>
