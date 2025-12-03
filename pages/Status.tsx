@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { useSearchParams, Link } from '../App';
-import { CheckCircle, FileText, Search, UserCheck, AlertCircle, Bus, GraduationCap, School } from 'lucide-react';
+import { CheckCircle, FileText, Search, UserCheck, AlertCircle, Bus, GraduationCap, School, Clock, Hash } from 'lucide-react';
 import { MOCK_STUDENT_REGISTRY } from '../constants';
 import { RegistryStudent } from '../types';
 
@@ -156,10 +157,17 @@ export const Status: React.FC = () => {
                   <div className="bg-white border border-slate-200 rounded-2xl p-0 overflow-hidden shadow-sm animate-in fade-in zoom-in-95">
                      <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-start">
                         <div>
-                          <h3 className="font-bold text-lg text-slate-900">{searchResult.name}</h3>
-                          <p className="text-xs font-mono text-slate-500 mt-1">ID: {searchResult.id}</p>
+                          <h3 className="font-bold text-lg text-slate-900 leading-tight">{searchResult.name}</h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">ID: {searchResult.id}</span>
+                            {searchResult.enrollmentId && (
+                               <span className="text-xs font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                 <Hash className="h-3 w-3" /> {searchResult.enrollmentId}
+                               </span>
+                            )}
+                          </div>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border whitespace-nowrap ${
                           searchResult.status === 'Matriculado' ? 'bg-green-50 text-green-700 border-green-200' :
                           searchResult.status === 'Pendente' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
                           'bg-blue-50 text-blue-700 border-blue-200'
@@ -183,37 +191,49 @@ export const Status: React.FC = () => {
                         <div className="h-px bg-slate-100 w-full"></div>
 
                         <div className="space-y-3">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                                    <GraduationCap className="h-4 w-4" />
+                            {searchResult.grade && (
+                                <div className="flex items-start gap-3">
+                                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg shrink-0">
+                                        <GraduationCap className="h-4 w-4" />
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs text-slate-500">Etapa / Turma</span>
+                                        <span className="text-sm font-medium text-slate-900 block">{searchResult.grade}</span>
+                                        {searchResult.className && <span className="text-xs text-blue-600 font-medium mt-0.5 block">{searchResult.className}</span>}
+                                    </div>
                                 </div>
-                                <div>
-                                    <span className="block text-xs text-slate-500">Etapa de Ensino</span>
-                                    <span className="text-sm font-medium text-slate-900">{searchResult.grade || "Não classificado"}</span>
-                                </div>
-                            </div>
+                            )}
 
-                            <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-lg ${searchResult.transportRequest ? 'bg-green-50 text-green-600' : 'bg-slate-50 text-slate-400'}`}>
+                             {/* Transport Info */}
+                            <div className="flex items-start gap-3">
+                                <div className={`p-2 rounded-lg shrink-0 ${searchResult.transportRequest ? 'bg-green-50 text-green-600' : 'bg-slate-50 text-slate-400'}`}>
                                     <Bus className="h-4 w-4" />
                                 </div>
                                 <div>
                                     <span className="block text-xs text-slate-500">Transporte Escolar</span>
                                     <span className={`text-sm font-medium ${searchResult.transportRequest ? 'text-green-700' : 'text-slate-500'}`}>
-                                        {searchResult.transportRequest ? 'Solicitado / Deferido' : 'Não Solicitado'}
+                                        {searchResult.transportRequest ? 'Utiliza Transporte Oficial' : 'Não Solicitado'}
                                     </span>
+                                    {searchResult.transportType && (
+                                        <span className="text-xs text-slate-500 block mt-0.5 capitalize">{searchResult.transportType}</span>
+                                    )}
                                 </div>
                             </div>
 
                             {searchResult.school && (
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                                <div className="flex items-start gap-3">
+                                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg shrink-0">
                                         <School className="h-4 w-4" />
                                     </div>
                                     <div>
                                         <span className="block text-xs text-slate-500">Unidade Escolar</span>
-                                        <span className="text-sm font-medium text-slate-900">{searchResult.school}</span>
-                                        {searchResult.shift && <span className="text-xs text-slate-500 ml-1">({searchResult.shift})</span>}
+                                        <span className="text-sm font-medium text-slate-900 block">{searchResult.school}</span>
+                                        {searchResult.shift && (
+                                            <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
+                                                <Clock className="h-3 w-3" />
+                                                {searchResult.shift}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}

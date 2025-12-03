@@ -1,3 +1,4 @@
+
 export enum SchoolType {
   INFANTIL = 'Educação Infantil',
   FUNDAMENTAL_1 = 'Fundamental I',
@@ -8,6 +9,7 @@ export enum SchoolType {
 
 export interface School {
   id: string;
+  inep?: string; // Added INEP/Admin code
   name: string;
   address: string;
   types: SchoolType[];
@@ -59,15 +61,20 @@ export interface ChatMessage {
   isLoading?: boolean;
 }
 
-// New interface for data extracted from PDF
+// Updated interface for data extracted from PDF
 export interface RegistryStudent {
-  id: string;
+  id: string; // ID único do aluno
+  enrollmentId?: string; // Código da Matrícula (PDF)
   name: string;
   birthDate: string;
   cpf: string;
   status: 'Matriculado' | 'Pendente' | 'Em Análise';
   school?: string;
-  shift?: string;
+  shift?: string; // Turno (Matutino/Vespertino)
   transportRequest?: boolean; // Matches 'Transporte escolar' from PDF
-  grade?: string; // Matches 'Etapa de ensino'
+  transportType?: string; // Detalhe do transporte (Vans/Kombis/Ônibus)
+  grade?: string; // Etapa de ensino
+  className?: string; // Nome da Turma (ex: GRUPO 4 F)
+  classId?: string; // Código da Turma
+  specialNeeds?: boolean; // Atendimento AEE
 }
