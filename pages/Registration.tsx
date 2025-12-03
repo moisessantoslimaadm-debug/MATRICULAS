@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import { INITIAL_REGISTRATION_STATE, MOCK_SCHOOLS } from '../constants';
 import { RegistrationFormState, SchoolType } from '../types';
 import { Check, ChevronRight, ChevronLeft, Upload, School as SchoolIcon, Bus, FileText, ListChecks } from 'lucide-react';
-import { useNavigate } from '../App';
+import { useNavigate } from '../router';
 
 export const Registration: React.FC = () => {
   const [formState, setFormState] = useState<RegistrationFormState>(INITIAL_REGISTRATION_STATE);

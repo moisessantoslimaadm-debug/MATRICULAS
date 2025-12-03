@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Link } from '../App';
+import { Link } from '../router';
 import { Calendar, CheckCircle2, MapPin, ArrowRight } from 'lucide-react';
 import { MUNICIPALITY_NAME } from '../constants';
 

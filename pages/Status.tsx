@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useSearchParams, Link } from '../App';
+import { useSearchParams, Link } from '../router';
 import { CheckCircle, FileText, Search, UserCheck, AlertCircle, Bus, GraduationCap, School, Clock, Hash } from 'lucide-react';
 import { MOCK_STUDENT_REGISTRY } from '../constants';
 import { RegistryStudent } from '../types';

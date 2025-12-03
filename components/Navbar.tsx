@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Link, useLocation } from '../App';
+import { Link, useLocation } from '../router';
 import { GraduationCap, Menu, X, Database } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
