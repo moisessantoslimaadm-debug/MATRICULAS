@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useSearchParams, Link } from '../router';
 import { CheckCircle, FileText, Search, UserCheck, AlertCircle, Bus, GraduationCap, School, Clock, Hash, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
@@ -6,6 +7,32 @@ import { RegistryStudent } from '../types';
 
 type SortField = 'name' | 'cpf';
 type SortDirection = 'asc' | 'desc';
+
+// Helper for normalizing text (removes accents, converts to lowercase, removes special chars)
+const normalizeString = (str: string) => {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, "") // Remove accents
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ""); // Remove special chars (keep letters, numbers, spaces)
+};
+
+// Helper to format CPF input dynamically
+const formatSearchInput = (value: string) => {
+  // If the first character is a number, apply CPF mask
+  // Also allows pasting a CPF with standard formatting
+  const numbers = value.replace(/\D/g, '');
+  
+  // If it starts with a number or looks like it's trying to be a CPF
+  if (/^\d/.test(value) || (numbers.length > 0 && numbers.length <= 11 && !/[a-z]/i.test(value))) {
+    return numbers
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+      .replace(/(-\d{2})\d+?$/, '$1');
+  }
+  return value; // Return as is for names
+};
 
 export const Status: React.FC = () => {
   const { students } = useData();
@@ -26,16 +53,36 @@ export const Status: React.FC = () => {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatSearchInput(e.target.value);
+    setStudentInput(formatted);
+  };
+
   const handleStudentSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentInput.trim()) return;
 
-    const term = studentInput.toLowerCase().trim();
-    const cleanTerm = term.replace(/[^\w\s]/gi, '');
+    const term = studentInput.trim();
+    const normalizedTerm = normalizeString(term);
+    const cleanCpfTerm = term.replace(/\D/g, '');
 
     const found = students.filter(s => {
-      const cleanCpf = s.cpf.replace(/[^\w\s]/gi, '');
-      return s.name.toLowerCase().includes(term) || (cleanCpf && cleanCpf.includes(cleanTerm));
+      // Name Search (Normalized & Robust)
+      // Removes special chars to ensure "D'Ávila" matches "davila"
+      const studentNameNorm = normalizeString(s.name);
+      const matchesName = studentNameNorm.includes(normalizedTerm);
+
+      // CPF Search (Clean numbers)
+      const studentCpfClean = s.cpf ? s.cpf.replace(/\D/g, '') : '';
+      // Only match CPF if the term looks like a CPF (has digits) and matches
+      // Allowing partial match for CPF if at least 3 digits to avoid noise
+      const matchesCpf = cleanCpfTerm.length >= 3 && studentCpfClean.includes(cleanCpfTerm);
+
+      // Protocol/ID Search
+      const matchesProtocol = s.enrollmentId && s.enrollmentId.toLowerCase().includes(term.toLowerCase());
+      const matchesId = s.id === term;
+
+      return matchesName || matchesCpf || matchesProtocol || matchesId;
     });
 
     setSearchResults(found);
@@ -68,6 +115,10 @@ export const Status: React.FC = () => {
          // Remove non-digits for cleaner sorting
          valA = valA.replace(/\D/g, '');
          valB = valB.replace(/\D/g, '');
+      } else {
+        // Case insensitive sort for names
+        valA = valA.toString().toLowerCase();
+        valB = valB.toString().toLowerCase();
       }
 
       if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
@@ -174,12 +225,12 @@ export const Status: React.FC = () => {
                      <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo ou CPF do Aluno</label>
                      <input 
                       type="text" 
-                      placeholder="Digite para buscar..." 
+                      placeholder="Digite o nome ou CPF (apenas números)..." 
                       value={studentInput}
-                      onChange={(e) => setStudentInput(e.target.value)}
+                      onChange={handleSearchInputChange}
                       className="w-full px-4 py-3 pl-11 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" 
                      />
-                     <Search className="absolute left-4 top-10 h-5 w-5 text-slate-400" />
+                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                    </div>
                    <button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition shadow-lg shadow-blue-200">
                     Pesquisar na Rede
@@ -233,7 +284,7 @@ export const Status: React.FC = () => {
                     </div>
                     <div>
                       <p className="font-semibold text-lg">Nenhum resultado encontrado</p>
-                      <p className="text-sm mt-1 text-red-600/80">Verifique os filtros ou o termo de busca digitado.</p>
+                      <p className="text-sm mt-1 text-red-600/80">Verifique os filtros, o termo de busca ou tente digitar o nome sem acentos.</p>
                     </div>
                   </div>
                 ) : (

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useData } from '../contexts/DataContext';
-import { MapPin, Star, Users, Search, Map as MapIcon, List, X, GraduationCap, Calendar, Hash, School as SchoolIcon, Layout, Filter, ArrowUpDown } from 'lucide-react';
+import { MapPin, Star, Users, Search, Map as MapIcon, List, X, Calendar, Hash, School as SchoolIcon, Layout, ArrowUpDown, PieChart } from 'lucide-react';
 import { SchoolType, School, RegistryStudent } from '../types';
 
 export const SchoolList: React.FC = () => {
@@ -197,68 +197,104 @@ export const SchoolList: React.FC = () => {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {processedSchools.map((school) => (
-              <div key={school.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition duration-300 group flex flex-col h-full">
-                <div className="relative h-40 overflow-hidden">
-                  <img 
-                    src={school.image} 
-                    alt={school.name} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500" 
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
-                  {school.inep && (
-                     <div className="absolute top-3 left-3 bg-black/40 backdrop-blur-md text-white text-[10px] font-mono px-2 py-0.5 rounded border border-white/20">
-                       INEP: {school.inep}
-                     </div>
-                  )}
-                  <div className="absolute bottom-4 left-4 right-4">
-                    <h3 className="text-lg font-bold text-white leading-tight shadow-black drop-shadow-md">{school.name}</h3>
-                  </div>
-                </div>
-                
-                <div className="p-5 flex-1 flex flex-col">
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {school.types.map(t => (
-                      <span key={t} className="text-[10px] uppercase font-bold tracking-wider px-2 py-1 bg-slate-100 text-slate-600 rounded-md border border-slate-200">
-                        {t}
-                      </span>
-                    ))}
+            {processedSchools.map((school) => {
+              const enrolledCount = students.filter(s => s.school === school.name).length;
+              const capacity = school.availableSlots;
+              const available = Math.max(0, capacity - enrolledCount);
+              const occupancy = capacity > 0 ? (enrolledCount / capacity) * 100 : 0;
+              
+              // Color logic for occupancy
+              let progressColor = 'bg-green-500';
+              let textColor = 'text-green-600';
+              if (occupancy > 75) { progressColor = 'bg-yellow-500'; textColor = 'text-yellow-600'; }
+              if (occupancy >= 95) { progressColor = 'bg-red-500'; textColor = 'text-red-600'; }
+
+              return (
+                <div key={school.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition duration-300 group flex flex-col h-full">
+                  <div className="relative h-40 overflow-hidden">
+                    <img 
+                      src={school.image} 
+                      alt={school.name} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-500" 
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
+                    {school.inep && (
+                       <div className="absolute top-3 left-3 bg-black/40 backdrop-blur-md text-white text-[10px] font-mono px-2 py-0.5 rounded border border-white/20">
+                         INEP: {school.inep}
+                       </div>
+                    )}
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <h3 className="text-lg font-bold text-white leading-tight shadow-black drop-shadow-md">{school.name}</h3>
+                    </div>
                   </div>
                   
-                  <div className="flex items-start gap-2.5 text-slate-600 mb-6 flex-1">
-                    <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0 text-slate-400" />
-                    <div className="flex flex-col">
-                        <span className="text-sm leading-snug">{school.address}</span>
-                        {school.distance !== undefined && (
-                            <span className="text-xs text-blue-600 font-medium mt-1">
-                                Aprox. {school.distance.toFixed(2)} km do Centro
-                            </span>
-                        )}
+                  <div className="p-5 flex-1 flex flex-col">
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {school.types.map(t => (
+                        <span key={t} className="text-[10px] uppercase font-bold tracking-wider px-2 py-1 bg-slate-100 text-slate-600 rounded-md border border-slate-200">
+                          {t}
+                        </span>
+                      ))}
                     </div>
-                  </div>
+                    
+                    <div className="flex items-start gap-2.5 text-slate-600 mb-6 flex-1">
+                      <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0 text-slate-400" />
+                      <div className="flex flex-col">
+                          <span className="text-sm leading-snug">{school.address}</span>
+                          {school.distance !== undefined && (
+                              <span className="text-xs text-blue-600 font-medium mt-1">
+                                  Aprox. {school.distance.toFixed(2)} km do Centro
+                              </span>
+                          )}
+                      </div>
+                    </div>
 
-                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto">
-                    <div className="flex items-center gap-2 text-slate-600" title="Capacidade Total">
-                      <Users className="h-4 w-4 text-slate-400" />
-                      <span className="text-sm font-medium text-slate-700">{school.availableSlots > 0 ? `${school.availableSlots} Vagas` : 'Lotação não inf.'}</span>
+                    {/* Enhanced Availability Section */}
+                    <div className="pt-4 border-t border-slate-100 mt-auto">
+                        <div className="flex justify-between items-end mb-2">
+                            <div>
+                                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Disponibilidade</p>
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-lg font-bold text-slate-800">{enrolledCount}</span>
+                                    <span className="text-xs text-slate-500 font-medium">/ {capacity > 0 ? capacity : '?'} preenchidas</span>
+                                </div>
+                            </div>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full bg-opacity-20 ${textColor.replace('text-', 'bg-')} ${textColor}`}>
+                                {capacity > 0 ? `${occupancy.toFixed(0)}%` : 'N/A'}
+                            </span>
+                        </div>
+                        
+                        <div className="w-full bg-slate-100 rounded-full h-2 mb-3 overflow-hidden">
+                            <div className={`h-full rounded-full transition-all duration-500 ${progressColor}`} style={{ width: `${Math.min(occupancy, 100)}%` }}></div>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-1.5" title="Vagas Restantes">
+                                  <div className={`w-2 h-2 rounded-full ${available > 0 ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                  <span className="text-xs text-slate-600 font-medium">
+                                      {capacity > 0 ? (available > 0 ? `${available} vagas restantes` : 'Sem vagas') : 'Capacidade n/i'}
+                                  </span>
+                            </div>
+
+                            <button 
+                                onClick={() => {
+                                    setSelectedSchool(school);
+                                    setModalActiveTab('students');
+                                    setStudentSearchTerm('');
+                                    setModalStatusFilter('Todos');
+                                    setModalClassFilter('Todas');
+                                }}
+                                className="text-blue-600 text-xs font-bold hover:text-blue-800 transition-colors flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg"
+                            >
+                              Ver Detalhes
+                              <Layout className="h-3 w-3 ml-1" />
+                            </button>
+                        </div>
                     </div>
-                    <button 
-                        onClick={() => {
-                            setSelectedSchool(school);
-                            setModalActiveTab('students');
-                            setStudentSearchTerm('');
-                            setModalStatusFilter('Todos');
-                            setModalClassFilter('Todas');
-                        }}
-                        className="text-blue-600 text-sm font-bold hover:text-blue-800 transition-colors flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg"
-                    >
-                      Ver Detalhes
-                      <Layout className="h-4 w-4 ml-1" />
-                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -365,15 +401,16 @@ export const SchoolList: React.FC = () => {
                                     />
                                 </div>
                                 
-                                <div className="flex gap-2 w-full sm:w-auto">
+                                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                                     <select 
                                         value={modalStatusFilter}
                                         onChange={(e) => setModalStatusFilter(e.target.value)}
                                         className="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none w-full sm:w-auto"
                                     >
-                                        <option value="Todos">Todos Status</option>
+                                        <option value="Todos">Status: Todos</option>
                                         <option value="Matriculado">Matriculado</option>
                                         <option value="Pendente">Pendente</option>
+                                        <option value="Em Análise">Em Análise</option>
                                     </select>
                                     
                                     <select 
@@ -381,7 +418,7 @@ export const SchoolList: React.FC = () => {
                                         onChange={(e) => setModalClassFilter(e.target.value)}
                                         className="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none w-full sm:w-auto"
                                     >
-                                        <option value="Todos">Todas Turmas</option>
+                                        <option value="Todas">Turmas: Todas</option>
                                         {availableClasses.map(cls => (
                                             <option key={cls} value={cls}>{cls}</option>
                                         ))}
@@ -396,7 +433,8 @@ export const SchoolList: React.FC = () => {
                                             <div key={student.id} className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm hover:border-blue-300 transition flex items-center justify-between group">
                                                 <div className="flex items-center gap-4">
                                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm uppercase ${
-                                                        student.status === 'Matriculado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                                        student.status === 'Matriculado' ? 'bg-green-100 text-green-700' : 
+                                                        student.status === 'Em Análise' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'
                                                     }`}>
                                                         {student.name.charAt(0)}
                                                     </div>
@@ -415,7 +453,8 @@ export const SchoolList: React.FC = () => {
                                                 </div>
                                                 <div className="text-right">
                                                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${
-                                                        student.status === 'Matriculado' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-yellow-50 text-yellow-700 border border-yellow-100'
+                                                        student.status === 'Matriculado' ? 'bg-green-50 text-green-700 border border-green-100' : 
+                                                        student.status === 'Em Análise' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-yellow-50 text-yellow-700 border border-yellow-100'
                                                     }`}>
                                                         {student.status}
                                                     </span>
@@ -513,16 +552,46 @@ export const SchoolList: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="bg-indigo-50 rounded-xl border border-indigo-100 p-6">
-                                <h3 className="text-lg font-bold text-indigo-900 mb-4">Resumo de Vagas</h3>
-                                <div className="flex gap-8">
-                                    <div>
-                                        <span className="block text-3xl font-bold text-indigo-700">{selectedSchool.availableSlots}</span>
-                                        <span className="text-sm text-indigo-600">Vagas Disponíveis (Estimada)</span>
+                            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                        <PieChart className="h-5 w-5 text-blue-600" />
+                                        Quadro de Vagas
+                                </h3>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-center justify-center text-center">
+                                            <span className="text-3xl font-bold text-slate-700 block mb-1">{selectedSchool.availableSlots || '-'}</span>
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Capacidade Total</span>
+                                        </div>
+                                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col items-center justify-center text-center">
+                                            <span className="text-3xl font-bold text-blue-700 block mb-1">{schoolStudents.length}</span>
+                                            <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">Matriculados</span>
+                                        </div>
+                                        <div className={`p-4 rounded-xl border flex flex-col items-center justify-center text-center ${Math.max(0, selectedSchool.availableSlots - schoolStudents.length) > 0 ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+                                            <span className={`text-3xl font-bold block mb-1 ${Math.max(0, selectedSchool.availableSlots - schoolStudents.length) > 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                                {Math.max(0, selectedSchool.availableSlots - schoolStudents.length)}
+                                            </span>
+                                            <span className={`text-xs font-bold uppercase tracking-wider ${Math.max(0, selectedSchool.availableSlots - schoolStudents.length) > 0 ? 'text-green-600' : 'text-red-400'}`}>
+                                                Disponíveis
+                                            </span>
+                                        </div>
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between items-end mb-2">
+                                        <span className="text-sm font-medium text-slate-600">Taxa de Ocupação</span>
+                                        <span className="text-lg font-bold text-slate-800">
+                                            {selectedSchool.availableSlots > 0 ? ((schoolStudents.length / selectedSchool.availableSlots) * 100).toFixed(1) : 0}%
+                                        </span>
                                     </div>
-                                    <div>
-                                        <span className="block text-3xl font-bold text-blue-700">{schoolStudents.length}</span>
-                                        <span className="text-sm text-blue-600">Alunos Ativos</span>
+                                    <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden">
+                                        <div 
+                                                className={`h-full rounded-full transition-all duration-500 ${
+                                                    (schoolStudents.length / (selectedSchool.availableSlots || 1)) >= 1 ? 'bg-red-500' : 
+                                                    (schoolStudents.length / (selectedSchool.availableSlots || 1)) > 0.8 ? 'bg-yellow-500' : 'bg-green-500'
+                                                }`}
+                                                style={{ width: `${Math.min(100, (schoolStudents.length / (selectedSchool.availableSlots || 1)) * 100)}%` }}
+                                        ></div>
                                     </div>
                                 </div>
                             </div>

@@ -6,6 +6,7 @@ import { Registration } from './pages/Registration';
 import { SchoolList } from './pages/SchoolList';
 import { Status } from './pages/Status';
 import { AdminData } from './pages/AdminData';
+import { Dashboard } from './pages/Dashboard';
 import { ChatAssistant } from './components/ChatAssistant';
 import { HashRouter, Routes, Route, useLocation } from './router';
 import { DataProvider } from './contexts/DataContext';
@@ -67,6 +68,7 @@ const App: React.FC = () => {
           <main className="flex-grow">
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/registration" element={<Registration />} />
               <Route path="/schools" element={<SchoolList />} />
               <Route path="/status" element={<Status />} />

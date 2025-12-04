@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from '../router';
-import { GraduationCap, Menu, X, Database } from 'lucide-react';
+import { GraduationCap, Menu, X, Database, LayoutDashboard } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = React.useState(false);
@@ -26,9 +26,10 @@ export const Navbar: React.FC = () => {
           
           <div className="hidden md:flex items-center space-x-8">
             <Link to="/" className={isActive('/')}>Início</Link>
+            <Link to="/dashboard" className={isActive('/dashboard')}>Dashboard</Link>
             <Link to="/schools" className={isActive('/schools')}>Escolas</Link>
-            <Link to="/registration" className={isActive('/registration')}>Realizar Matrícula</Link>
-            <Link to="/status" className={isActive('/status')}>Consultar Protocolo</Link>
+            <Link to="/registration" className={isActive('/registration')}>Matrícula</Link>
+            <Link to="/status" className={isActive('/status')}>Protocolo</Link>
             <Link to="/admin/data" className={`${isActive('/admin/data')} flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-slate-100`}>
               <Database className="h-3 w-3" />
               <span className="text-sm">Gestão</span>
@@ -51,6 +52,10 @@ export const Navbar: React.FC = () => {
         <div className="md:hidden bg-white border-t border-slate-200">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
             <Link to="/" onClick={toggleMenu} className="block px-3 py-2 rounded-md text-base font-medium text-slate-700 hover:text-blue-600 hover:bg-slate-50">Início</Link>
+            <Link to="/dashboard" onClick={toggleMenu} className="block px-3 py-2 rounded-md text-base font-medium text-slate-700 hover:text-blue-600 hover:bg-slate-50 flex items-center gap-2">
+              <LayoutDashboard className="h-4 w-4" />
+              Dashboard
+            </Link>
             <Link to="/schools" onClick={toggleMenu} className="block px-3 py-2 rounded-md text-base font-medium text-slate-700 hover:text-blue-600 hover:bg-slate-50">Escolas</Link>
             <Link to="/registration" onClick={toggleMenu} className="block px-3 py-2 rounded-md text-base font-medium text-slate-700 hover:text-blue-600 hover:bg-slate-50">Realizar Matrícula</Link>
             <Link to="/status" onClick={toggleMenu} className="block px-3 py-2 rounded-md text-base font-medium text-slate-700 hover:text-blue-600 hover:bg-slate-50">Consultar Protocolo</Link>
