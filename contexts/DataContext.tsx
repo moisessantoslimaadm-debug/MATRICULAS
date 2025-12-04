@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { School, RegistryStudent } from '../types';
 import { MOCK_SCHOOLS, MOCK_STUDENT_REGISTRY } from '../constants';
@@ -15,7 +14,7 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const DataProvider = ({ children }: { children?: ReactNode }) => {
   // Inicializa com os dados do LocalStorage se existirem, senão usa os Mocks
   const [schools, setSchools] = useState<School[]>(() => {
     const saved = localStorage.getItem('educa_schools');

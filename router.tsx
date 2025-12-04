@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, createContext, useContext } from 'react';
 
 const RouterContext = createContext<{ path: string; navigate: (path: string) => void }>({
@@ -36,7 +35,7 @@ export function Link({ to, children, className, onClick, ...props }: any) {
   );
 }
 
-export function Routes({ children }: { children: React.ReactNode }) {
+export function Routes({ children }: { children?: React.ReactNode }) {
   const { pathname } = useLocation();
   let match = null;
   
@@ -57,7 +56,7 @@ export function Route({ path, element }: { path: string; element: React.ReactNod
   return null;
 }
 
-export function HashRouter({ children }: { children: React.ReactNode }) {
+export function HashRouter({ children }: { children?: React.ReactNode }) {
   const [path, setPath] = useState(window.location.hash.slice(1) || '/');
 
   useEffect(() => {

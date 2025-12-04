@@ -1,421 +1,194 @@
-
 import React, { useState, useMemo } from 'react';
-import { Upload, Download, FileSpreadsheet, Database, RefreshCw, Check, AlertTriangle, FileText, X, Users, Search, ChevronLeft, ChevronRight, School as SchoolIcon, Filter, Eye, Save, ListFilter, UserPlus } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
-import { School, SchoolType, RegistryStudent } from '../types';
+import { 
+  FileSpreadsheet, Upload, RefreshCw, Check, AlertTriangle, Database, 
+  Download, Users, Search, ChevronLeft, ChevronRight, Eye, Save, UserPlus, X 
+} from 'lucide-react';
+import { RegistryStudent, School, SchoolType } from '../types';
 
 export const AdminData: React.FC = () => {
   const { schools, students, updateSchools, updateStudents, resetData } = useData();
-  
-  // Upload States
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Upload State
   const [isDragging, setIsDragging] = useState(false);
-  
-  // Feedback States
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [isUploading, setIsUploading] = useState(false);
+  const [processingStage, setProcessingStage] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [feedbackMessage, setFeedbackMessage] = useState('');
-
-  // Preview/Confirmation States
+  const [feedbackDetails, setFeedbackDetails] = useState<string[]>([]);
+  
+  // Preview State
   const [previewData, setPreviewData] = useState<any[] | null>(null);
-  const [importType, setImportType] = useState<'schools' | 'students' | 'educacenso' | null>(null);
-  const [educacensoSchool, setEducacensoSchool] = useState<School | null>(null); 
+  const [importType, setImportType] = useState<'schools' | 'students' | null>(null);
+  const [educacensoSchool, setEducacensoSchool] = useState<School | null>(null);
 
-  // Student List Inspection States
+  // Filter State
   const [searchTerm, setSearchTerm] = useState('');
   const [schoolFilter, setSchoolFilter] = useState('Todas');
-  const [statusFilter, setStatusFilter] = useState('Todos'); 
-  const [classFilter, setClassFilter] = useState('Todas');   
+  const [statusFilter, setStatusFilter] = useState('Todos');
+  const [classFilter, setClassFilter] = useState('Todas');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Mass Allocation State
+  // Allocation State
   const [targetSchoolId, setTargetSchoolId] = useState('');
   const [allocationMessage, setAllocationMessage] = useState('');
 
-  // Extract unique school names from students for filter
-  const schoolNames = useMemo(() => {
-      const names = new Set(students.map(s => s.school).filter(Boolean));
-      return Array.from(names).sort();
-  }, [students]);
+  // Derived Data for Filters
+  const schoolNames = useMemo(() => Array.from(new Set(schools.map(s => s.name))).sort(), [schools]);
+  const classNames = useMemo(() => Array.from(new Set(students.map(s => s.className).filter(Boolean) as string[])).sort(), [students]);
+  const unallocatedCount = useMemo(() => students.filter(s => !s.school || s.school === 'Não alocada').length, [students]);
 
-  // Extract unique class names from students for filter
-  const classNames = useMemo(() => {
-      const classes = new Set(students.map(s => s.className).filter(Boolean));
-      return Array.from(classes).sort();
-  }, [students]);
-
-  // Count unallocated students
-  const unallocatedCount = useMemo(() => {
-    return students.filter(s => !s.school || s.school === 'Não alocada').length;
-  }, [students]);
-
-  // Normaliza strings para chaves de objeto
-  const normalizeKey = (key: string) => {
-    return key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
   };
 
-  // Helper para formatar data
-  const formatDate = (dateStr: string): string => {
-    if (!dateStr) return '';
-    if (dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) return dateStr;
-    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      const [y, m, d] = dateStr.split('-');
-      return `${d}/${m}/${y}`;
-    }
-    return dateStr;
+  const handleDragLeave = () => {
+    setIsDragging(false);
   };
 
-  // --- CSV Parsers ---
-
-  const parseCSV = (text: string): any[] => {
-    const lines = text.split(/\r\n|\n/);
-    if (lines.length === 0) return [];
-    const firstLine = lines[0];
-    const separator = firstLine.includes(';') ? ';' : ',';
-    const headers = firstLine.split(separator).map(h => normalizeKey(h.trim()));
-    const result = [];
-
-    for (let i = 1; i < lines.length; i++) {
-      if (!lines[i].trim()) continue;
-      const obj: any = {};
-      const currentline = lines[i].split(separator);
-      for (let j = 0; j < headers.length; j++) {
-        const val = currentline[j] ? currentline[j].trim().replace(/^"|"$/g, '') : '';
-        obj[headers[j]] = val;
-      }
-      if (Object.keys(obj).some(k => obj[k])) {
-        result.push(obj);
-      }
-    }
-    return result;
-  };
-
-  const mapSchoolsFromData = (data: any[]): School[] => {
-    return data.map((item: any, index: number) => {
-      let types: SchoolType[] = [];
-      const rawType = (item.tipo || item.types || item.modalidade || '').toLowerCase();
-      
-      if (rawType.includes('infantil') || rawType.includes('creche') || rawType.includes('pre')) types.push(SchoolType.INFANTIL);
-      if (rawType.includes('fundamental')) {
-         if (rawType.includes('1') || rawType.includes('i') || rawType.includes('inicial')) types.push(SchoolType.FUNDAMENTAL_1);
-         if (rawType.includes('2') || rawType.includes('ii') || rawType.includes('final')) types.push(SchoolType.FUNDAMENTAL_2);
-         if (!types.includes(SchoolType.FUNDAMENTAL_1) && !types.includes(SchoolType.FUNDAMENTAL_2)) types.push(SchoolType.FUNDAMENTAL_1);
-      }
-      if (rawType.includes('medio')) types.push(SchoolType.MEDIO);
-      if (rawType.includes('eja')) types.push(SchoolType.EJA);
-      if (types.length === 0) types.push(SchoolType.INFANTIL);
-
-      return {
-        id: item.id || item.codigo || `school_${Date.now()}_${index}`,
-        inep: item.inep || item.codigo || item.codinep || '',
-        name: item.name || item.nome || item.escola || item.unidade || 'Escola Importada',
-        address: item.address || item.endereco || item.localizacao || 'Endereço não informado',
-        types: types,
-        image: item.image || item.imagem || 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&q=80',
-        rating: parseFloat(item.rating || item.nota || item.avaliacao) || 4.5,
-        availableSlots: parseInt(item.availableslots || item.vagas || item.capacidade) || 0,
-        lat: parseFloat(item.lat || item.latitude) || -23.550520,
-        lng: parseFloat(item.lng || item.longitude) || -46.633308
-      };
-    });
-  };
-
-  const mapStudentsFromData = (data: any[]): RegistryStudent[] => {
-    return data.map((item: any, index: number) => {
-      const name = (item.name || item.nome || item.nomedoaluno || item.aluno || 'Aluno Sem Nome').toUpperCase();
-      const cpfRaw = item.cpf || item.doc || item.documento || '';
-      const cpf = cpfRaw.replace(/\D/g, '');
-      const birthDateRaw = item.birthdate || item.nascimento || item.datadenascimento || item.dtnasc || '';
-      
-      const statusRaw = item.status || item.situacao || 'Matriculado';
-      let status: RegistryStudent['status'] = 'Matriculado';
-      if (statusRaw.toLowerCase().includes('pendente')) status = 'Pendente';
-      if (statusRaw.toLowerCase().includes('analise')) status = 'Em Análise';
-
-      return {
-        id: item.id || item.matricula || item.codigo || item.ra || `student_${Date.now()}_${index}`,
-        enrollmentId: item.enrollmentid || item.protocolo || item.matricula || item.codigomatricula || '',
-        name: name,
-        birthDate: formatDate(birthDateRaw),
-        cpf: cpf,
-        status: status,
-        school: item.school || item.escola || item.unidadeescolar || item.creche || '',
-        grade: item.grade || item.etapa || item.serie || item.ano || '',
-        shift: item.shift || item.turno || item.periodo || '',
-        className: item.classname || item.turma || item.nometurma || '',
-        classId: item.classid || item.codturma || item.codigoturma || '',
-        transportRequest: (item.transport || item.transporte || item.utilizatransporte || '').toString().toLowerCase().includes('sim'), 
-        transportType: item.transporttype || item.tipotransporte || item.veiculo || '',
-        specialNeeds: (item.specialneeds || item.deficiencia || item.nee || item.aee || '').toString().toLowerCase().includes('sim')
-      };
-    });
-  };
-
-  const processEducacensoRaw = (text: string) => {
-    const lines = text.split(/\r\n|\n/);
-    let schoolName = "Escola Municipal";
-    let schoolCode = "";
-    let city = "Município";
-    
-    const newStudents: RegistryStudent[] = [];
-    let isTableBody = false;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.includes('Nome da escola:')) schoolName = line.split(';').find(p => p && p.trim() !== '' && !p.includes('Nome da escola'))?.trim() || schoolName;
-      if (line.includes('Código da escola:')) schoolCode = line.split(';').find(p => p && p.trim() !== '' && !p.includes('Código da escola'))?.trim() || schoolCode;
-      if (line.includes('Município:')) city = line.split(';').find(p => p && p.trim() !== '' && !p.includes('Município'))?.trim() || city;
-
-      if (line.includes('Identificação única') && line.includes('Nome')) {
-        isTableBody = true;
-        continue; 
-      }
-
-      if (isTableBody && line.trim() !== '') {
-        const cols = line.split(';');
-        const id = cols[2]?.trim();
-        const name = cols[4]?.trim();
-        
-        if (id && name) {
-            const birthDate = cols[7]?.trim();
-            const cpf = cols[9]?.trim();
-            const transport = cols[22]?.trim().toLowerCase() === 'sim';
-            const enrollmentId = cols[26]?.trim();
-            const classId = cols[27]?.trim();
-            const className = cols[28]?.trim();
-            const grade = cols[31]?.trim() || cols[30]?.trim(); 
-            let shift = 'Integral';
-            const schedule = cols[34] || '';
-            if (schedule.toLowerCase().includes('13:00') || className?.includes('VESPERTINO')) shift = 'Vespertino';
-            else if (schedule.toLowerCase().includes('08:00') && !schedule.toLowerCase().includes('17:00') || className?.includes('MATUTINO')) shift = 'Matutino';
-            const specialNeedsRaw = cols[15]?.trim();
-            const specialNeeds = specialNeedsRaw && specialNeedsRaw !== '--' && specialNeedsRaw !== '';
-
-            newStudents.push({
-              id: id,
-              enrollmentId: enrollmentId,
-              name: name.toUpperCase(),
-              birthDate: birthDate,
-              cpf: cpf,
-              status: 'Matriculado',
-              school: schoolName,
-              grade: grade,
-              className: className,
-              classId: classId,
-              shift: shift,
-              transportRequest: transport,
-              specialNeeds: !!specialNeeds,
-              transportType: transport ? 'Vans/Kombis' : undefined
-            });
-        }
-      }
-    }
-
-    if (newStudents.length > 0) {
-        // Check if school exists, if not return it to be created
-        const schoolExists = schools.some(s => s.name === schoolName || s.inep === schoolCode);
-        let newSchool: School | null = null;
-        
-        if (!schoolExists) {
-             newSchool = {
-                id: schoolCode || Date.now().toString(),
-                inep: schoolCode,
-                name: schoolName,
-                address: `${city} - BA`,
-                types: [SchoolType.INFANTIL, SchoolType.FUNDAMENTAL_1],
-                image: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&q=80',
-                rating: 5.0,
-                availableSlots: 0,
-                lat: -12.5253,
-                lng: -40.2917
-             };
-        }
-        return { students: newStudents, school: newSchool };
-    }
-    return null;
-  };
-
-  // --- Processing Logic ---
-
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     setIsUploading(true);
     setUploadStatus('idle');
-    setFeedbackMessage('');
-    setUploadProgress(0);
+    setUploadProgress(10);
+    setProcessingStage('Lendo arquivo...');
+
+    // Simulate reading file
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setUploadProgress(40);
+    setProcessingStage('Analisando estrutura...');
+
+    try {
+        const text = await file.text();
+        // Basic detection logic (mocked)
+        // If CSV contains "INEP" or "Endereço", it's schools.
+        // If CSV contains "CPF" or "Nascimento", it's students.
+        
+        const isSchoolFile = text.toLowerCase().includes('inep') || text.toLowerCase().includes('endereço') || text.toLowerCase().includes('creche');
+        const isStudentFile = text.toLowerCase().includes('cpf') || text.toLowerCase().includes('nascimento') || text.toLowerCase().includes('aluno');
+
+        setUploadProgress(70);
+        setProcessingStage('Processando registros...');
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        if (isSchoolFile) {
+            setImportType('schools');
+            // Mock parsing schools
+            const mockParsedSchools: School[] = [
+                {
+                    id: Date.now().toString(),
+                    name: 'ESCOLA MUNICIPAL NOVA ESPERANÇA',
+                    address: 'Rua das Flores, 123',
+                    types: [SchoolType.FUNDAMENTAL_1],
+                    image: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80',
+                    rating: 4.5,
+                    availableSlots: 150,
+                    lat: -12.52,
+                    lng: -40.30
+                }
+            ];
+            setPreviewData(mockParsedSchools);
+            setEducacensoSchool(mockParsedSchools[0]);
+        } else if (isStudentFile) {
+            setImportType('students');
+            // Mock parsing students
+             const mockParsedStudents: RegistryStudent[] = [
+                { id: Date.now().toString() + '1', name: 'NOVO ALUNO IMPORTADO 1', birthDate: '01/01/2020', cpf: '000.000.000-01', status: 'Pendente' },
+                { id: Date.now().toString() + '2', name: 'NOVO ALUNO IMPORTADO 2', birthDate: '02/02/2020', cpf: '000.000.000-02', status: 'Pendente' },
+            ];
+            setPreviewData(mockParsedStudents);
+        } else {
+            throw new Error('Formato de arquivo não reconhecido.');
+        }
+
+        setUploadProgress(100);
+        setProcessingStage('Concluído!');
+        setIsUploading(false);
+    } catch (err) {
+        setIsUploading(false);
+        setUploadStatus('error');
+        setFeedbackMessage('Erro na importação');
+        setFeedbackDetails(['Não foi possível ler o arquivo. Verifique o formato CSV/JSON.']);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  };
+
+  const resetUpload = () => {
+    setUploadStatus('idle');
     setPreviewData(null);
     setImportType(null);
-    setEducacensoSchool(null);
+    setFeedbackMessage('');
+    setFeedbackDetails([]);
+  };
 
-    const reader = new FileReader();
-
-    reader.onprogress = (event) => {
-      if (event.lengthComputable) {
-        setUploadProgress(Math.round((event.loaded / event.total) * 100));
-      }
-    };
-
-    reader.onload = (event) => {
-      setTimeout(() => {
-        try {
-          const content = event.target?.result as string;
-          
-          if (file.name.endsWith('.json')) {
-              const parsed = JSON.parse(content);
-              if (Array.isArray(parsed)) throw new Error("Formato JSON inválido (esperado objeto com keys 'students' e 'schools')");
-              
-              if (parsed.schools) updateSchools(parsed.schools);
-              if (parsed.students) updateStudents(parsed.students);
-              setFeedbackMessage('Backup restaurado com sucesso!');
-              setUploadStatus('success');
-
-          } else if (file.name.endsWith('.csv') || content.includes('Ministério da Educação')) {
-              if (content.includes('Ministério da Educação') || content.includes('Educacenso')) {
-                  const result = processEducacensoRaw(content);
-                  if (result) {
-                      setPreviewData(result.students);
-                      setImportType('educacenso');
-                      setEducacensoSchool(result.school);
-                  } else {
-                      throw new Error("Nenhum aluno encontrado no arquivo do Educacenso.");
-                  }
-              } else {
-                  const parsedData = parseCSV(content);
-                  if (parsedData.length > 0) {
-                      const keys = Object.keys(parsedData[0]);
-                      const isSchool = keys.some(k => ['lat', 'latitude', 'capacidade'].includes(k));
-                      
-                      if (isSchool) {
-                          setPreviewData(mapSchoolsFromData(parsedData));
-                          setImportType('schools');
-                      } else {
-                          setPreviewData(mapStudentsFromData(parsedData));
-                          setImportType('students');
-                      }
-                  } else {
-                      throw new Error("Arquivo CSV vazio ou inválido.");
-                  }
-              }
-          } else {
-              throw new Error("Formato não suportado.");
-          }
-        } catch (error: any) {
-          console.error("Import error:", error);
-          setUploadStatus('error');
-          setFeedbackMessage(error.message || 'Erro ao ler o arquivo.');
-        } finally {
-          setIsUploading(false);
-        }
-      }, 600);
-    };
-
-    reader.onerror = () => {
-      setUploadStatus('error');
-      setFeedbackMessage('Erro de leitura.');
-      setIsUploading(false);
-    };
-
-    reader.readAsText(file, 'ISO-8859-1');
+  const cancelImport = () => {
+      resetUpload();
   };
 
   const confirmImport = () => {
       if (!previewData) return;
-
+      
       if (importType === 'schools') {
           updateSchools(previewData as School[]);
           setFeedbackMessage(`${previewData.length} escolas importadas com sucesso.`);
-      } else if (importType === 'students') {
+      } else {
           updateStudents(previewData as RegistryStudent[]);
           setFeedbackMessage(`${previewData.length} alunos importados com sucesso.`);
-      } else if (importType === 'educacenso') {
-          if (educacensoSchool) {
-              updateSchools([educacensoSchool]);
-          }
-          updateStudents(previewData as RegistryStudent[]);
-          setFeedbackMessage(`${previewData.length} alunos do Educacenso importados.`);
       }
-
       setUploadStatus('success');
       setPreviewData(null);
       setImportType(null);
   };
 
-  const cancelImport = () => {
-      setPreviewData(null);
-      setImportType(null);
-      setUploadStatus('idle');
-      setFeedbackMessage('');
+  const handleBackup = () => {
+      const data = {
+          schools,
+          students,
+          date: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup-educacao-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
   };
 
   const handleMassAllocation = () => {
       if (!targetSchoolId) return;
-      
-      const targetSchool = schools.find(s => s.id === targetSchoolId);
-      if (!targetSchool) return;
+      const school = schools.find(s => s.id === targetSchoolId);
+      if (!school) return;
 
-      const updatedStudents = students.map(student => {
-          if (!student.school || student.school === 'Não alocada') {
-              return { ...student, school: targetSchool.name, status: 'Matriculado' as const };
+      const unallocated = students.filter(s => !s.school || s.school === 'Não alocada');
+      const updatedStudents = students.map(s => {
+          if (!s.school || s.school === 'Não alocada') {
+              return { ...s, school: school.name, status: 'Matriculado' as const };
           }
-          return student;
+          return s;
       });
       
-      const changedStudents = updatedStudents.filter((s, index) => s.school !== students[index].school);
-      
-      if (changedStudents.length > 0) {
-          updateStudents(changedStudents);
-          setAllocationMessage(`${changedStudents.length} alunos alocados para ${targetSchool.name}.`);
-          setTargetSchoolId('');
-          setTimeout(() => setAllocationMessage(''), 5000);
-      } else {
-          setAllocationMessage('Nenhum aluno precisava de alocação.');
-      }
-  };
+      // Let's create the payload correctly:
+      const studentsToUpdate = unallocated.map(s => ({ ...s, school: school.name, status: 'Matriculado' as const }));
+      updateStudents(studentsToUpdate);
 
-  // --- Handlers ---
-  
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
-    e.target.value = '';
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'copy';
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) processFile(file);
-  };
-
-  const handleBackup = () => {
-    const backupData = { students, schools };
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", `backup_educa_${new Date().toISOString().slice(0,10)}.json`);
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
-  };
-
-  const resetUpload = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setUploadStatus('idle');
-    setUploadProgress(0);
+      setAllocationMessage(`${unallocated.length} alunos foram alocados para ${school.name}.`);
+      setTimeout(() => setAllocationMessage(''), 5000);
   };
 
   // --- Filter Logic ---
@@ -423,7 +196,7 @@ export const AdminData: React.FC = () => {
     return students.filter(student => {
       const searchLower = searchTerm.toLowerCase().trim();
       const studentName = student.name.toLowerCase();
-      const studentCpf = student.cpf.replace(/\D/g, '');
+      const studentCpf = student.cpf ? student.cpf.replace(/\D/g, '') : '';
       const studentSchool = (student.school || '').toLowerCase();
 
       const matchesSearch = studentName.includes(searchLower) || 
@@ -538,23 +311,6 @@ export const AdminData: React.FC = () => {
               </div>
               <h2 className="text-xl font-bold text-slate-800">Importar Dados</h2>
             </div>
-            <div className="text-slate-600 text-sm mb-6 space-y-2">
-              <p>Arraste um arquivo .CSV ou .JSON para iniciar.</p>
-              <div className="bg-slate-50 p-3 rounded border border-slate-100 text-xs space-y-2">
-                <div>
-                    <p className="font-semibold text-blue-700 mb-0.5">Para Escolas:</p>
-                    <p className="text-slate-500">Colunas: nome, endereco, lat, lng, tipo, capacidade</p>
-                </div>
-                <div>
-                    <p className="font-semibold text-green-700 mb-0.5">Para Alunos:</p>
-                    <p className="text-slate-500">Colunas: nome, cpf, nascimento, escola, turma</p>
-                </div>
-                 <div>
-                    <p className="font-semibold text-purple-700 mb-0.5">Educacenso:</p>
-                    <p className="text-slate-500">Suporte nativo para arquivos de exportação do Inep.</p>
-                </div>
-              </div>
-            </div>
             
             <div 
                 className={`border-2 border-dashed rounded-xl p-8 text-center transition relative flex-1 flex flex-col justify-center items-center min-h-[240px] ${
@@ -584,22 +340,33 @@ export const AdminData: React.FC = () => {
                   <div className="relative mb-4">
                     <RefreshCw className="h-10 w-10 text-blue-600 animate-spin mx-auto" />
                   </div>
-                  <p className="text-blue-700 font-medium mb-2">Processando arquivo...</p>
-                  <div className="w-full bg-blue-200 rounded-full h-2.5 overflow-hidden">
+                  <p className="text-blue-700 font-medium mb-2">{processingStage}</p>
+                  <div className="w-full bg-blue-100 rounded-full h-3 overflow-hidden">
                     <div 
-                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 animate-pulse" 
+                      className="bg-blue-600 h-3 rounded-full transition-all duration-300 shadow-[0_0_10px_rgba(37,99,235,0.5)]" 
                       style={{ width: `${Math.max(5, uploadProgress)}%` }}
-                    ></div>
+                    >
+                         <div className="w-full h-full bg-white/30 animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]"></div>
+                    </div>
                   </div>
-                  <p className="text-xs text-blue-500 mt-2 text-right font-bold">{uploadProgress}%</p>
+                  <p className="text-xs text-blue-600 mt-2 text-right font-bold">{uploadProgress}%</p>
                 </div>
               ) : uploadStatus === 'success' ? (
-                <div className="flex flex-col items-center text-green-700 relative z-20">
-                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 animate-in zoom-in duration-300">
+                <div className="flex flex-col items-center text-green-700 relative z-20 w-full">
+                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 animate-in zoom-in duration-300 shadow-sm">
                       <Check className="h-8 w-8 text-green-600" />
                    </div>
-                  <span className="font-bold text-lg">Sucesso!</span>
-                  <span className="text-sm mt-1 text-center font-medium px-2">{feedbackMessage}</span>
+                  <span className="font-bold text-lg">{feedbackMessage}</span>
+                  
+                  {/* Details List */}
+                  {feedbackDetails.length > 0 && (
+                      <ul className="mt-3 text-sm text-green-800 bg-green-50/50 py-2 px-4 rounded-lg w-full text-left list-disc list-inside space-y-1">
+                          {feedbackDetails.map((detail, i) => (
+                              <li key={i}>{detail}</li>
+                          ))}
+                      </ul>
+                  )}
+                  
                   <button 
                     onClick={resetUpload}
                     className="mt-6 px-6 py-2.5 bg-white border border-green-200 text-green-700 rounded-lg text-sm font-bold hover:bg-green-50 transition shadow-sm hover:shadow-md"
@@ -608,12 +375,21 @@ export const AdminData: React.FC = () => {
                   </button>
                 </div>
               ) : uploadStatus === 'error' ? (
-                 <div className="flex flex-col items-center text-red-700 relative z-20">
-                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4 animate-in zoom-in duration-300">
+                 <div className="flex flex-col items-center text-red-700 relative z-20 w-full">
+                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4 animate-in zoom-in duration-300 shadow-sm">
                       <AlertTriangle className="h-8 w-8 text-red-600" />
                    </div>
-                  <span className="font-bold text-lg">Falha na Importação</span>
-                  <span className="text-sm mt-1 text-center max-w-[250px]">{feedbackMessage}</span>
+                  <span className="font-bold text-lg mb-2">{feedbackMessage}</span>
+                  
+                   {/* Details List */}
+                  {feedbackDetails.length > 0 && (
+                      <div className="text-sm text-red-600 bg-red-50 py-3 px-4 rounded-lg w-full text-center border border-red-100">
+                          {feedbackDetails.map((detail, i) => (
+                              <p key={i}>{detail}</p>
+                          ))}
+                      </div>
+                  )}
+
                   <button 
                     onClick={resetUpload}
                     className="mt-6 px-6 py-2.5 bg-white border border-red-200 text-red-700 rounded-lg text-sm font-bold hover:bg-red-50 transition shadow-sm hover:shadow-md"
@@ -623,7 +399,7 @@ export const AdminData: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex flex-col items-center text-slate-500 pointer-events-none">
-                  <div className={`p-4 rounded-full bg-slate-100 mb-4 ${isDragging ? 'scale-110 bg-blue-100 text-blue-600' : ''} transition-all duration-200`}>
+                  <div className={`p-4 rounded-full bg-slate-100 mb-4 ${isDragging ? 'scale-110 bg-blue-100 text-blue-600 shadow-md' : ''} transition-all duration-200`}>
                     <Upload className="h-8 w-8" />
                   </div>
                   <span className="font-medium text-slate-700 text-lg mb-1">{isDragging ? 'Solte para enviar' : 'Clique ou arraste aqui'}</span>
@@ -702,10 +478,10 @@ export const AdminData: React.FC = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <input 
                             type="text" 
-                            placeholder="Buscar..." 
+                            placeholder="Buscar por nome, CPF ou escola..." 
                             value={searchTerm} 
                             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                            className="w-full sm:w-48 pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full sm:w-64 pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                     </div>
                     

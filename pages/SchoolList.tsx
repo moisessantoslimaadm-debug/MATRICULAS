@@ -381,7 +381,7 @@ export const SchoolList: React.FC = () => {
                                         onChange={(e) => setModalClassFilter(e.target.value)}
                                         className="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none w-full sm:w-auto"
                                     >
-                                        <option value="Todas">Todas Turmas</option>
+                                        <option value="Todos">Todas Turmas</option>
                                         {availableClasses.map(cls => (
                                             <option key={cls} value={cls}>{cls}</option>
                                         ))}
@@ -438,7 +438,7 @@ export const SchoolList: React.FC = () => {
                          <div className="p-6 overflow-y-auto">
                             {Object.entries(schoolClassesGrouped).length > 0 ? (
                                 <div className="grid md:grid-cols-2 gap-4">
-                                    {Object.entries(schoolClassesGrouped).map(([className, students]) => (
+                                    {Object.entries(schoolClassesGrouped).map(([className, classStudents]: [string, RegistryStudent[]]) => (
                                         <div key={className} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
                                             <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
                                                 <div className="flex items-center gap-2">
@@ -446,18 +446,18 @@ export const SchoolList: React.FC = () => {
                                                     <h3 className="font-bold text-slate-800">{className}</h3>
                                                 </div>
                                                 <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded-full">
-                                                    {students.length} Alunos
+                                                    {classStudents.length} Alunos
                                                 </span>
                                             </div>
                                             <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                                                {students.slice(0, 5).map(s => (
+                                                {classStudents.slice(0, 5).map(s => (
                                                     <div key={s.id} className="text-xs text-slate-600 py-1 border-b border-slate-50 last:border-0">
                                                         {s.name}
                                                     </div>
                                                 ))}
-                                                {students.length > 5 && (
+                                                {classStudents.length > 5 && (
                                                     <div className="text-xs text-center text-blue-500 font-medium pt-1">
-                                                        + {students.length - 5} outros alunos
+                                                        + {classStudents.length - 5} outros alunos
                                                     </div>
                                                 )}
                                             </div>

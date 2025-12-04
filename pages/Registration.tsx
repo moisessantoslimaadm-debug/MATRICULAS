@@ -6,20 +6,103 @@ import { RegistrationFormState, RegistryStudent } from '../types';
 import { Check, ChevronRight, ChevronLeft, Upload, School as SchoolIcon, Bus, FileText, ListChecks, MapPin, Navigation, AlertCircle } from 'lucide-react';
 import { useNavigate } from '../router';
 
+// Utility to validate CPF
+const isValidCPF = (cpf: string): boolean => {
+  cpf = cpf.replace(/[^\d]+/g, '');
+  if (cpf === '') return false;
+  // Elimina CPFs invalidos conhecidos
+  if (cpf.length !== 11 ||
+    cpf === "00000000000" ||
+    cpf === "11111111111" ||
+    cpf === "22222222222" ||
+    cpf === "33333333333" ||
+    cpf === "44444444444" ||
+    cpf === "55555555555" ||
+    cpf === "66666666666" ||
+    cpf === "77777777777" ||
+    cpf === "88888888888" ||
+    cpf === "99999999999")
+    return false;
+
+  // Valida 1o digito
+  let add = 0;
+  for (let i = 0; i < 9; i++)
+    add += parseInt(cpf.charAt(i)) * (10 - i);
+  let rev = 11 - (add % 11);
+  if (rev === 10 || rev === 11)
+    rev = 0;
+  if (rev !== parseInt(cpf.charAt(9)))
+    return false;
+
+  // Valida 2o digito
+  add = 0;
+  for (let i = 0; i < 10; i++)
+    add += parseInt(cpf.charAt(i)) * (11 - i);
+  rev = 11 - (add % 11);
+  if (rev === 10 || rev === 11)
+    rev = 0;
+  if (rev !== parseInt(cpf.charAt(10)))
+    return false;
+
+  return true;
+};
+
+// Utility to format CPF
+const formatCPF = (value: string) => {
+  return value
+    .replace(/\D/g, '') // substitui qualquer caracter que nao seja numero por nada
+    .replace(/(\d{3})(\d)/, '$1.$2') // captura 2 grupos de numero o primeiro de 3 e o segundo de 1, apos a captura, o $1.$2 adiciona um ponto entre eles
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+    .replace(/(-\d{2})\d+?$/, '$1'); // captura 2 numeros seguidos de um traço e não deixa ser digitado mais nada
+};
+
 export const Registration: React.FC = () => {
-  const { schools, addStudent } = useData(); // Use schools and addStudent from context
+  const { schools, addStudent } = useData();
   const [formState, setFormState] = useState<RegistrationFormState>(INITIAL_REGISTRATION_STATE);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const navigate = useNavigate();
 
   const handleInputChange = (section: 'student' | 'guardian' | 'address', field: string, value: any) => {
+    let finalValue = value;
+
+    // Apply mask for CPF fields
+    if (field === 'cpf') {
+      finalValue = formatCPF(value);
+      // Clear error when typing
+      if (errors[`${section}Cpf`]) {
+        setErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[`${section}Cpf`];
+            return newErrors;
+        });
+      }
+    }
+
     setFormState(prev => ({
       ...prev,
       [section]: {
         ...prev[section],
-        [field]: value
+        [field]: finalValue
       }
     }));
+  };
+
+  const handleBlur = (section: 'student' | 'guardian') => {
+    const cpf = section === 'student' ? formState.student.cpf : formState.guardian.cpf;
+    
+    // Student CPF is optional, but if provided, must be valid
+    if (section === 'student' && (!cpf || cpf.trim() === '')) {
+        return;
+    }
+
+    if (cpf && !isValidCPF(cpf)) {
+      setErrors(prev => ({
+        ...prev,
+        [`${section}Cpf`]: 'CPF inválido. Verifique os números digitados.'
+      }));
+    }
   };
 
   // Haversine formula to calculate distance in km
@@ -43,6 +126,17 @@ export const Registration: React.FC = () => {
   };
 
   const nextStep = () => {
+    // Validate Guardian CPF before moving from step 2
+    if (formState.step === 2) {
+        if (!isValidCPF(formState.guardian.cpf)) {
+             setErrors(prev => ({
+                ...prev,
+                guardianCpf: 'CPF do responsável é obrigatório e deve ser válido.'
+              }));
+              return;
+        }
+    }
+
     if (formState.step === 3) {
       // Simulate getting coordinates from the address
       const coords = simulateGeocoding();
@@ -60,6 +154,21 @@ export const Registration: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Final validation check
+    if (errors.studentCpf || errors.guardianCpf) {
+        alert("Por favor, corrija os erros no formulário antes de prosseguir.");
+        return;
+    }
+    if (!isValidCPF(formState.guardian.cpf)) {
+        setErrors(prev => ({...prev, guardianCpf: 'CPF Inválido'}));
+        return;
+    }
+    if (formState.student.cpf && !isValidCPF(formState.student.cpf)) {
+         setErrors(prev => ({...prev, studentCpf: 'CPF Inválido'}));
+         return;
+    }
+
     setIsSubmitting(true);
 
     // Create a new student object
@@ -211,8 +320,11 @@ export const Registration: React.FC = () => {
                         placeholder="000.000.000-00"
                         value={formState.student.cpf}
                         onChange={(e) => handleInputChange('student', 'cpf', e.target.value)}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        onBlur={() => handleBlur('student')}
+                        maxLength={14}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none ${errors.studentCpf ? 'border-red-500' : 'border-slate-300'}`}
                       />
+                      {errors.studentCpf && <p className="text-red-500 text-xs mt-1">{errors.studentCpf}</p>}
                     </div>
                   </div>
                   
@@ -261,15 +373,18 @@ export const Registration: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">CPF</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">CPF *</label>
                       <input
                         type="text"
                         required
                         placeholder="000.000.000-00"
                         value={formState.guardian.cpf}
                         onChange={(e) => handleInputChange('guardian', 'cpf', e.target.value)}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        onBlur={() => handleBlur('guardian')}
+                        maxLength={14}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none ${errors.guardianCpf ? 'border-red-500' : 'border-slate-300'}`}
                       />
+                      {errors.guardianCpf && <p className="text-red-500 text-xs mt-1">{errors.guardianCpf}</p>}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Parentesco</label>
@@ -292,6 +407,7 @@ export const Registration: React.FC = () => {
                       <input
                         type="email"
                         required
+                        placeholder="exemplo@email.com"
                         value={formState.guardian.email}
                         onChange={(e) => handleInputChange('guardian', 'email', e.target.value)}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -302,6 +418,7 @@ export const Registration: React.FC = () => {
                       <input
                         type="tel"
                         required
+                        placeholder="(00) 90000-0000"
                         value={formState.guardian.phone}
                         onChange={(e) => handleInputChange('guardian', 'phone', e.target.value)}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
