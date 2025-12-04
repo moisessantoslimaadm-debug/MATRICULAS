@@ -1,6 +1,5 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, User, Loader2, HelpCircle, FileText, Calendar, MapPin } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, Loader2, HelpCircle, FileText, Calendar, MapPin } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { sendMessageToGemini } from '../services/geminiService';
 

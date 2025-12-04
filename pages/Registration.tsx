@@ -1,9 +1,8 @@
-
 import React, { useState, useMemo } from 'react';
 import { INITIAL_REGISTRATION_STATE } from '../constants';
 import { useData } from '../contexts/DataContext';
 import { RegistrationFormState, RegistryStudent } from '../types';
-import { Check, ChevronRight, ChevronLeft, Upload, School as SchoolIcon, Bus, FileText, ListChecks, MapPin, Navigation, AlertCircle } from 'lucide-react';
+import { Check, ChevronRight, ChevronLeft, Upload, School as SchoolIcon, Bus, FileText, ListChecks, MapPin, Navigation, AlertCircle, Loader2 } from 'lucide-react';
 import { useNavigate } from '../router';
 
 // Utility to validate CPF
@@ -57,10 +56,19 @@ const formatCPF = (value: string) => {
     .replace(/(-\d{2})\d+?$/, '$1'); // captura 2 numeros seguidos de um traço e não deixa ser digitado mais nada
 };
 
+// Utility to format CEP
+const formatCEP = (value: string) => {
+  return value
+    .replace(/\D/g, '')
+    .replace(/^(\d{5})(\d)/, '$1-$2')
+    .substring(0, 9);
+};
+
 export const Registration: React.FC = () => {
   const { schools, addStudent } = useData();
   const [formState, setFormState] = useState<RegistrationFormState>(INITIAL_REGISTRATION_STATE);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingCep, setIsLoadingCep] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const navigate = useNavigate();
 
@@ -80,6 +88,14 @@ export const Registration: React.FC = () => {
       }
     }
 
+    // Apply mask and fetch for CEP
+    if (field === 'zipCode') {
+        finalValue = formatCEP(value);
+        if (finalValue.length === 9) {
+            fetchAddressByCep(finalValue);
+        }
+    }
+
     setFormState(prev => ({
       ...prev,
       [section]: {
@@ -87,6 +103,35 @@ export const Registration: React.FC = () => {
         [field]: finalValue
       }
     }));
+  };
+
+  const fetchAddressByCep = async (cep: string) => {
+      const cleanCep = cep.replace(/\D/g, '');
+      if (cleanCep.length !== 8) return;
+
+      setIsLoadingCep(true);
+      try {
+          const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+          const data = await response.json();
+          
+          if (!data.erro) {
+              setFormState(prev => ({
+                  ...prev,
+                  address: {
+                      ...prev.address,
+                      street: data.logradouro,
+                      neighborhood: data.bairro,
+                      city: data.localidade,
+                      // Keep existing number/complement
+                  }
+              }));
+              // Clear any previous address errors
+          }
+      } catch (error) {
+          console.error("Erro ao buscar CEP:", error);
+      } finally {
+          setIsLoadingCep(false);
+      }
   };
 
   const handleBlur = (section: 'student' | 'guardian') => {
@@ -121,8 +166,8 @@ export const Registration: React.FC = () => {
 
   // Mock geocoding service
   const simulateGeocoding = () => {
-    // Returns a fixed coordinate in the middle of typical municipality area
-    return { lat: -23.562000, lng: -46.645000 }; 
+    // Returns a fixed coordinate in Itaberaba-BA (Near City Center) to match the provided data context
+    return { lat: -12.5260, lng: -40.2930 }; 
   };
 
   const nextStep = () => {
@@ -435,15 +480,22 @@ export const Registration: React.FC = () => {
                 <h3 className="text-lg font-semibold text-slate-800 border-b pb-2">Endereço Residencial</h3>
                 <div className="grid gap-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
+                    <div className="relative">
                       <label className="block text-sm font-medium text-slate-700 mb-1">CEP</label>
                       <input
                         type="text"
                         required
+                        placeholder="00000-000"
                         value={formState.address.zipCode}
                         onChange={(e) => handleInputChange('address', 'zipCode', e.target.value)}
+                        maxLength={9}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                       />
+                      {isLoadingCep && (
+                          <div className="absolute right-3 top-[34px] animate-spin">
+                              <Loader2 className="h-4 w-4 text-blue-500" />
+                          </div>
+                      )}
                     </div>
                      <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-slate-700 mb-1">Cidade</label>
